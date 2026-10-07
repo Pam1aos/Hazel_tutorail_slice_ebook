@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 011：窗口抽象与 GLFW</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: var(--text-secondary); font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-011-glfw">Hazel 游戏引擎笔记 011：窗口抽象与 GLFW</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=11">The Cherno 游戏引擎系列第 11 讲“窗口抽象与 GLFW”</a>，时长约 29 分 20 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。代码参考提交：<a href="https://github.com/TheCherno/Hazel/tree/6815f07cd23eb5cd55cfe6fccaec5aefdc8169e8"><code>6815f07</code></a>。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材；术语和代码以原视频及同期 Hazel 仓库为准。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>上一讲完成了预编译头，本节终于把窗口类接入 Hazel。不过窗口并不是直接写死在应用程序里，而是先建立平台无关的 <code>Window</code> 接口，再由 Windows 平台实现 <code>WindowsWindow</code>，底层通过 GLFW 创建原生窗口和 OpenGL 上下文。</p>
+<p>本节完成后，引擎能够：</p>
+<ul>
+<li>在运行时初始化 GLFW；</li>
+<li>创建默认 <code>1280×720</code> 的窗口；</li>
+<li>建立 OpenGL 上下文并清屏为洋红色；</li>
+<li>由 <code>Application</code> 通过 <code>std::unique_ptr&lt;Window&gt;</code> 管理窗口生命周期；</li>
+<li>在 <code>Window</code> 中预留事件回调接口，供下一讲把 GLFW 事件转发到应用程序。</li>
+</ul>
+<p><strong>本讲不处理键盘、鼠标和窗口事件。</strong> 事件回调接口只是为下一讲准备，当前窗口甚至还不能通过关闭按钮正确结束程序。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_26_00.png" alt="Hazel 运行后创建出的 Hazel Engine 窗口与初始化日志" loading="lazy">
+  <p class="video-caption">📷 Hazel 运行后创建出的 Hazel Engine 窗口与初始化日志<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=11&t=1560" target="_blank" rel="noopener">回到原视频 (00:26:00)</a></p>
+</div>
+
+<h2 id="1">1. 为什么现在做窗口</h2>
+<p><em>(参考时间: 00:00:08)</em></p>
+<p>严格从工程顺序看，游戏引擎可以在很晚才创建窗口。日志系统、事件系统、应用系统、层系统和输入管理等基础模块，都可能在窗口之前完成。但本系列同时承担教学与内容节奏，如果一直不显示任何图形，观众很难直观看到进展。</p>
+<p>Cherno 因此做出折中：先完成日志和事件等必要基础，再开始创建窗口。日志用于观察窗口初始化是否成功，事件系统则与窗口输入紧密相关。窗口实现完成后，下一步才有稳定的 OpenGL 上下文来绘制画面和接入 ImGui。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[日志系统] --&gt; D[窗口系统]
+    B[事件系统] --&gt; D
+    C[预编译头] --&gt; D
+    D --&gt; E[OpenGL 上下文]
+    E --&gt; F[图形渲染]
+    E --&gt; G[ImGui]
+    D --&gt; H[下一讲: GLFW 事件转发]
+</code></pre></div>
+
+<h2 id="2">2. 平台抽象应该放在哪里</h2>
+<p><em>(参考时间: 00:04:48)</em></p>
+<p>GLFW 本身已经跨平台，能够在 Windows、macOS 和 Linux 上创建窗口，并提供 OpenGL 上下文。即便如此，Hazel 仍然选择“每个平台一个窗口实现”，而不是把 GLFW 调用直接写进通用应用代码。</p>
+<p>原因是未来不同平台仍可能出现差异：</p>
+<ul>
+<li>Windows 后续若改用 Win32 和 DirectX，需要直接获得 <code>HWND</code>、设备上下文等原生句柄；</li>
+<li>macOS 和 Linux 可能有各自特有的窗口行为；</li>
+<li>移动平台通常没有传统桌面窗口，而是使用 surface；</li>
+<li>渲染后端还可能扩展为 OpenGL、DirectX、Vulkan 和 Metal。</li>
+</ul>
+<p>因此，平台抽象被分成两层：</p>
+<ol>
+<li><code>Hazel/Window.h</code> 定义与平台无关的窗口接口；</li>
+<li><code>Hazel/src/Platform/Windows/WindowsWindow.*</code> 实现 Windows 版本。</li>
+</ol>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Application&lt;br/&gt;平台无关] --&gt; B[Window 接口&lt;br/&gt;平台无关]
+    B --&gt; C[WindowsWindow]
+    C --&gt; D[GLFW]
+    D --&gt; E[Win32 API]
+    B -. 未来 .-&gt; F[MacWindow]
+    B -. 未来 .-&gt; G[LinuxWindow]
+    C -. 未来 .-&gt; H[DirectX]
+</code></pre></div>
+
+<p><code>Platform</code> 目录未来不仅放操作系统代码，也会放渲染 API 代码。这样通用代码只依赖抽象接口，平台细节集中在明确目录中。</p>
+<h2 id="3-git-glfw">3. 用 Git 子模块引入 GLFW</h2>
+<p><em>(参考时间: 00:08:21)</em></p>
+<p>Cherno 使用了自己维护的 GLFW 分支，并为其补充 Premake 构建脚本。GLFW 不会以预编译二进制方式直接塞进仓库，而是作为 Git 子模块放置到：</p>
+<div class="highlight"><pre><span></span><code>Hazel/vendor/GLFW
+</code></pre></div>
+
+<p>命令形式上相当于：</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>submodule<span class="w"> </span>add<span class="w"> </span>https://github.com/TheCherno/glfw<span class="w"> </span>Hazel/vendor/GLFW
+</code></pre></div>
+
+<p>使用子模块的好处是源码和构建脚本都在解决方案中，可以统一编译、调试和升级。缺点是依赖本身维护在独立仓库，主仓库只记录它指向的具体提交。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_09_12.png" alt="在命令行中添加 GLFW 子模块" loading="lazy">
+  <p class="video-caption">📷 在命令行中添加 GLFW 子模块<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=11&t=552" target="_blank" rel="noopener">回到原视频 (00:09:12)</a></p>
+</div>
+
+<h2 id="4-glfw-premake">4. 把 GLFW 接入 Premake</h2>
+<p><em>(参考时间: 00:09:53)</em></p>
+<p>主 Premake 文件增加三项关键配置：</p>
+<ol>
+<li>建立依赖包含目录表；</li>
+<li>引入 GLFW 自己的 Premake 文件；</li>
+<li>让 Hazel 链接 GLFW 和 <code>opengl32.lib</code>。</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="nv">IncludeDir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span>
+<span class="nv">IncludeDir</span><span class="p">[</span><span class="s2">"GLFW"</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Hazel/vendor/GLFW/include"</span>
+
+<span class="nv">include</span><span class="w"> </span><span class="s2">"Hazel/vendor/GLFW"</span>
+
+<span class="nv">includedirs</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="s2">"%{prj.name}/src"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"%{prj.name}/vendor/spdlog/include"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"%{IncludeDir.GLFW}"</span>
+<span class="p">}</span>
+
+<span class="nv">links</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="s2">"GLFW"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"opengl32.lib"</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><code>include "Hazel/vendor/GLFW"</code> 会把 GLFW 提供的 Premake 文件展开到当前构建脚本中，从而生成一个名为 GLFW 的静态库项目。Hazel 随后把它作为项目依赖链接进去。</p>
+<p>视频中还顺带处理了 Lua 文件里 Tab 与空格混用造成的缩进问题。格式本身不改变编译结果，但会让差异和后续维护变得混乱，因此需要统一缩进规则。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_09_53.png" alt="Premake 中加入 GLFW 包含路径、项目和链接配置" loading="lazy">
+  <p class="video-caption">📷 Premake 中加入 GLFW 包含路径、项目和链接配置<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=11&t=593" target="_blank" rel="noopener">回到原视频 (00:09:53)</a></p>
+</div>
+
+<p>运行 <code>GenerateProjects.bat</code> 后，Visual Studio 解决方案中会出现 GLFW 项目，Hazel 项目也会显示对 GLFW 的引用。第一次编译时虽然出现了 Visual Studio 不认识的命令行选项，但构建仍成功，说明 GLFW 已经作为静态库接入了工程。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_15_01.png" alt="Visual Studio 中生成 GLFW 项目并完成首次编译" loading="lazy">
+  <p class="video-caption">📷 Visual Studio 中生成 GLFW 项目并完成首次编译<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=11&t=901" target="_blank" rel="noopener">回到原视频 (00:15:01)</a></p>
+</div>
+
+<h2 id="5-window">5. Window 接口与窗口属性</h2>
+<p><em>(参考时间: 00:15:09)</em></p>
+<p>平台无关的窗口接口位于 <code>Hazel/Window.h</code>。它几乎没有状态，只有一组纯虚函数，相当于桌面窗口的抽象契约。</p>
+<div class="highlight"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">WindowProps</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">Title</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">Width</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">Height</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">WindowProps</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">title</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"Hazel Engine"</span><span class="p">,</span>
+<span class="w">                </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1280</span><span class="p">,</span>
+<span class="w">                </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">height</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">720</span><span class="p">)</span>
+<span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="n">Title</span><span class="p">(</span><span class="n">title</span><span class="p">),</span><span class="w"> </span><span class="n">Width</span><span class="p">(</span><span class="n">width</span><span class="p">),</span><span class="w"> </span><span class="n">Height</span><span class="p">(</span><span class="n">height</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">};</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">Window</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="k">using</span><span class="w"> </span><span class="n">EventCallbackFn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">function</span><span class="o">&lt;</span><span class="kt">void</span><span class="p">(</span><span class="n">Event</span><span class="o">&amp;</span><span class="p">)</span><span class="o">&gt;</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="o">~</span><span class="n">Window</span><span class="p">()</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">OnUpdate</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">GetWidth</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">GetHeight</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">SetEventCallback</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">EventCallbackFn</span><span class="o">&amp;</span><span class="w"> </span><span class="n">callback</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">SetVSync</span><span class="p">(</span><span class="kt">bool</span><span class="w"> </span><span class="n">enabled</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="nf">IsVSync</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="n">Window</span><span class="o">*</span><span class="w"> </span><span class="nf">Create</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">WindowProps</span><span class="o">&amp;</span><span class="w"> </span><span class="n">props</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">WindowProps</span><span class="p">());</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>这里有几个重要设计点：</p>
+<ul>
+<li><code>WindowProps</code> 把标题和尺寸集中为配置对象，并提供 <code>Hazel Engine</code>、<code>1280×720</code> 默认值；</li>
+<li><code>EventCallbackFn</code> 允许应用注册一个接收 <code>Event&amp;</code> 的回调；</li>
+<li><code>OnUpdate()</code> 每帧调用一次，负责平台窗口的消息与缓冲区交换；</li>
+<li><code>SetVSync()</code> 和 <code>IsVSync()</code> 暴露垂直同步控制；</li>
+<li><code>Create()</code> 是静态工厂，但实现放在平台文件中，因此会返回对应平台的窗口子类。</li>
+</ul>
+<p>接口中完全不包含 GLFW 类型。应用代码因此不需要包含 <code>glfw3.h</code>，也不会和具体平台实现耦合。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_15_13.png" alt="平台无关的 Window 接口与默认窗口属性" loading="lazy">
+  <p class="video-caption">📷 平台无关的 Window 接口与默认窗口属性<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=11&t=913" target="_blank" rel="noopener">回到原视频 (00:15:13)</a></p>
+</div>
+
+<h3 id="51-windowcpp">5.1 为什么没有 Window.cpp</h3>
+<p><code>Window</code> 本身只是接口，不应包含平台创建逻辑。<code>Create()</code> 的声明可以放在通用头文件，但实现必须由当前平台的 <code>.cpp</code> 提供。</p>
+<p>Windows 构建时，<code>Window::Create()</code> 返回 <code>WindowsWindow</code>；未来 macOS 构建时，同一函数可以返回 <code>MacWindow</code>。选择哪个实现发生在编译期，不需要在运行时写 <code>switch</code> 判断平台。</p>
+<h2 id="6-windowswindow">6. WindowsWindow 的数据布局</h2>
+<p><em>(参考时间: 00:17:20)</em></p>
+<p>Windows 实现位于 <code>Platform/Windows/WindowsWindow.h</code>。它继承 <code>Window</code>，保存一个原生 GLFW 窗口指针，并把通用窗口数据组织到 <code>WindowData</code> 中。</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">WindowsWindow</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">Window</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">WindowsWindow</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">WindowProps</span><span class="o">&amp;</span><span class="w"> </span><span class="n">props</span><span class="p">);</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="o">~</span><span class="n">WindowsWindow</span><span class="p">();</span>
+
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">OnUpdate</span><span class="p">()</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">GetWidth</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">m_Data</span><span class="p">.</span><span class="n">Width</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">GetHeight</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">m_Data</span><span class="p">.</span><span class="n">Height</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">SetEventCallback</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">EventCallbackFn</span><span class="o">&amp;</span><span class="w"> </span><span class="n">callback</span><span class="p">)</span><span class="w"> </span><span class="k">override</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">m_Data</span><span class="p">.</span><span class="n">EventCallback</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">callback</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">SetVSync</span><span class="p">(</span><span class="kt">bool</span><span class="w"> </span><span class="n">enabled</span><span class="p">)</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="nf">IsVSync</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">Init</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">WindowProps</span><span class="o">&amp;</span><span class="w"> </span><span class="n">props</span><span class="p">);</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">Shutdown</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">GLFWwindow</span><span class="o">*</span><span class="w"> </span><span class="n">m_Window</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">WindowData</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">Title</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">Width</span><span class="p">,</span><span class="w"> </span><span class="n">Height</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">bool</span><span class="w"> </span><span class="n">VSync</span><span class="p">;</span>
+<span class="w">        </span><span class="n">EventCallbackFn</span><span class="w"> </span><span class="n">EventCallback</span><span class="p">;</span>
+<span class="w">    </span><span class="p">};</span>
+
+<span class="w">    </span><span class="n">WindowData</span><span class="w"> </span><span class="n">m_Data</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>为什么需要单独的 <code>WindowData</code>？GLFW 的事件回调是普通函数指针，不能直接绑定 C++ 成员函数和当前对象。GLFW 提供“window user pointer”，允许每个窗口携带一段自定义数据。</p>
+<p>Hazel 选择把 <code>WindowData</code> 的地址交给 GLFW。回调发生时，可以从原生窗口取回同一个结构，读取或更新宽高、VSync 和事件回调，而不需要把整个 <code>WindowsWindow</code> 类型暴露给 GLFW。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[GLFWwindow*] --&gt;|glfwSetWindowUserPointer| B[WindowData*]
+    B --&gt; C[Title]
+    B --&gt; D[Width / Height]
+    B --&gt; E[VSync]
+    B --&gt; F[EventCallback]
+    F -. 下一讲 .-&gt; G[构造 Event 并回调 Application]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_18_02.png" alt="WindowsWindow 与 WindowData 的私有数据布局" loading="lazy">
+  <p class="video-caption">📷 WindowsWindow 与 WindowData 的私有数据布局<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=11&t=1082" target="_blank" rel="noopener">回到原视频 (00:18:02)</a></p>
+</div>
+
+<h2 id="7-glfw">7. 工厂函数与 GLFW 单次初始化</h2>
+<p><em>(参考时间: 00:18:46)</em></p>
+<p><code>Window::Create()</code> 的实现只有一行：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Window</span><span class="o">*</span><span class="w"> </span><span class="nf">Window::Create</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">WindowProps</span><span class="o">&amp;</span><span class="w"> </span><span class="n">props</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">WindowsWindow</span><span class="p">(</span><span class="n">props</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>它返回基类指针，调用方不需要知道具体类型。<code>Application</code> 之后会用 <code>std::unique_ptr&lt;Window&gt;</code> 接管这个对象。</p>
+<h3 id="71">7.1 静态初始化标记</h3>
+<p>GLFW 在进程中只应初始化一次，但同一个程序未来可能创建多个窗口。因此 Windows 实现使用静态布尔值记录全局初始化状态：</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">s_GLFWInitialized</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+</code></pre></div>
+
+<p>初始化逻辑如下：</p>
+<div class="highlight"><pre><span></span><code><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">s_GLFWInitialized</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">success</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">glfwInit</span><span class="p">();</span>
+<span class="w">    </span><span class="n">HZ_CORE_ASSERT</span><span class="p">(</span><span class="n">success</span><span class="p">,</span><span class="w"> </span><span class="s">"Could not intialize GLFW!"</span><span class="p">);</span>
+<span class="w">    </span><span class="n">s_GLFWInitialized</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这里特意把 <code>glfwInit()</code> 的返回值保存到局部变量，再交给断言检查。原因是断言在发布构建中可能被完全移除；如果把初始化函数直接写在断言表达式里，发布版就不会执行 <code>glfwInit()</code>。</p>
+<p>如果未来需要断言始终保留表达式副作用，可以引入 <code>VERIFY</code> 宏。它与断言相似，但即使断言输出被关闭，仍然会执行被检查的表达式。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_19_14.png" alt="WindowsWindow::Init 中单次初始化 GLFW" loading="lazy">
+  <p class="video-caption">📷 WindowsWindow::Init 中单次初始化 GLFW<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=11&t=1154" target="_blank" rel="noopener">回到原视频 (00:19:14)</a></p>
+</div>
+
+<h2 id="8">8. 断言系统</h2>
+<p><em>(参考时间: 00:20:17)</em></p>
+<p><code>Core.h</code> 新增了客户端断言和核心断言：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#ifdef HZ_ENABLE_ASSERTS</span>
+<span class="w">    </span><span class="cp">#define HZ_ASSERT(x, ...) { \</span>
+<span class="cp">        if (!(x)) { \</span>
+<span class="cp">            HZ_ERROR("Assertion Failed: {0}", __VA_ARGS__); \</span>
+<span class="cp">            __debugbreak(); \</span>
+<span class="cp">        } \</span>
+<span class="cp">    }</span>
+
+<span class="w">    </span><span class="cp">#define HZ_CORE_ASSERT(x, ...) { \</span>
+<span class="cp">        if (!(x)) { \</span>
+<span class="cp">            HZ_CORE_ERROR("Assertion Failed: {0}", __VA_ARGS__); \</span>
+<span class="cp">            __debugbreak(); \</span>
+<span class="cp">        } \</span>
+<span class="cp">    }</span>
+<span class="cp">#else</span>
+<span class="w">    </span><span class="cp">#define HZ_ASSERT(x, ...)</span>
+<span class="w">    </span><span class="cp">#define HZ_CORE_ASSERT(x, ...)</span>
+<span class="cp">#endif</span>
+</code></pre></div>
+
+<p>启用断言时，条件失败会记录错误并触发调试器断点；关闭断言后，宏展开为空，不产生发布版开销。当前 <code>__debugbreak()</code> 是 Windows 专用实现，未来支持其他平台时需要切换为平台对应机制。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_20_17.png" alt="Core.h 中新增的断言宏" loading="lazy">
+  <p class="video-caption">📷 Core.h 中新增的断言宏<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=11&t=1217" target="_blank" rel="noopener">回到原视频 (00:20:17)</a></p>
+</div>
+
+<h2 id="9-glfw-opengl">9. 创建 GLFW 窗口与 OpenGL 上下文</h2>
+<p><em>(参考时间: 00:22:00)</em></p>
+<p><code>WindowsWindow::Init()</code> 完成以下步骤：</p>
+<ol>
+<li>把 <code>WindowProps</code> 复制到 <code>m_Data</code>；</li>
+<li>记录窗口创建日志；</li>
+<li>在必要时初始化 GLFW；</li>
+<li>调用 <code>glfwCreateWindow()</code>；</li>
+<li>将 OpenGL 上下文设为当前上下文；</li>
+<li>将 <code>m_Data</code> 注册为窗口用户指针；</li>
+<li>默认开启 VSync。</li>
+</ol>
+<p>关键代码如下：</p>
+<div class="highlight"><pre><span></span><code><span class="n">m_Data</span><span class="p">.</span><span class="n">Title</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">props</span><span class="p">.</span><span class="n">Title</span><span class="p">;</span>
+<span class="n">m_Data</span><span class="p">.</span><span class="n">Width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">props</span><span class="p">.</span><span class="n">Width</span><span class="p">;</span>
+<span class="n">m_Data</span><span class="p">.</span><span class="n">Height</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">props</span><span class="p">.</span><span class="n">Height</span><span class="p">;</span>
+
+<span class="n">HZ_CORE_INFO</span><span class="p">(</span><span class="s">"Creating window {0} ({1}, {2})"</span><span class="p">,</span>
+<span class="w">             </span><span class="n">props</span><span class="p">.</span><span class="n">Title</span><span class="p">,</span><span class="w"> </span><span class="n">props</span><span class="p">.</span><span class="n">Width</span><span class="p">,</span><span class="w"> </span><span class="n">props</span><span class="p">.</span><span class="n">Height</span><span class="p">);</span>
+
+<span class="n">m_Window</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">glfwCreateWindow</span><span class="p">(</span>
+<span class="w">    </span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">props</span><span class="p">.</span><span class="n">Width</span><span class="p">,</span>
+<span class="w">    </span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">props</span><span class="p">.</span><span class="n">Height</span><span class="p">,</span>
+<span class="w">    </span><span class="n">m_Data</span><span class="p">.</span><span class="n">Title</span><span class="p">.</span><span class="n">c_str</span><span class="p">(),</span>
+<span class="w">    </span><span class="nb">nullptr</span><span class="p">,</span>
+<span class="w">    </span><span class="nb">nullptr</span><span class="p">);</span>
+
+<span class="n">glfwMakeContextCurrent</span><span class="p">(</span><span class="n">m_Window</span><span class="p">);</span>
+<span class="n">glfwSetWindowUserPointer</span><span class="p">(</span><span class="n">m_Window</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">m_Data</span><span class="p">);</span>
+<span class="n">SetVSync</span><span class="p">(</span><span class="nb">true</span><span class="p">);</span>
+</code></pre></div>
+
+<p><code>glfwCreateWindow()</code> 的前两个参数是逻辑宽高，第三个参数是窗口标题。两个 <code>nullptr</code> 分别表示使用默认显示器和与当前 GLFW 上下文共享资源的窗口。当前版本直接从 GLFW 获得 OpenGL 上下文，尚未配置 OpenGL 版本、Core Profile 或显式加载函数。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_22_00.png" alt="glfwCreateWindow、OpenGL 上下文与用户指针设置" loading="lazy">
+  <p class="video-caption">📷 glfwCreateWindow、OpenGL 上下文与用户指针设置<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=11&t=1320" target="_blank" rel="noopener">回到原视频 (00:22:00)</a></p>
+</div>
+
+<h2 id="10-vsync">10. VSync、更新与关闭</h2>
+<p><em>(参考时间: 00:23:04)</em></p>
+<h3 id="101-vsync">10.1 VSync</h3>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">WindowsWindow::SetVSync</span><span class="p">(</span><span class="kt">bool</span><span class="w"> </span><span class="n">enabled</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">enabled</span><span class="p">)</span>
+<span class="w">        </span><span class="n">glfwSwapInterval</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="w">    </span><span class="k">else</span>
+<span class="w">        </span><span class="n">glfwSwapInterval</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">m_Data</span><span class="p">.</span><span class="n">VSync</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">enabled</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>交换间隔为 <code>1</code> 时，缓冲区交换通常等待一个垂直刷新周期，从而把帧率限制在显示器刷新率附近；设置为 <code>0</code> 则不等待。这里的 <code>1</code> 表示间隔数量，不应理解成“只允许渲染一帧”。</p>
+<p>GLFW 不提供查询当前交换间隔的简单接口，因此 Hazel 在 <code>WindowData</code> 中自行保存 <code>VSync</code> 状态，由 <code>IsVSync()</code> 返回。</p>
+<h3 id="102">10.2 每帧更新</h3>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">WindowsWindow::OnUpdate</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glfwPollEvents</span><span class="p">();</span>
+<span class="w">    </span><span class="n">glfwSwapBuffers</span><span class="p">(</span><span class="n">m_Window</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><code>glfwPollEvents()</code> 处理操作系统和 GLFW 收集到的事件；<code>glfwSwapBuffers()</code> 提交当前 OpenGL 帧。考虑到本讲尚未注册事件回调，这里已经把所有输入事件从系统队列中取走，却还没有转交给 Hazel。</p>
+<h3 id="103">10.3 关闭</h3>
+<p>析构函数调用 <code>Shutdown()</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">WindowsWindow::Shutdown</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glfwDestroyWindow</span><span class="p">(</span><span class="n">m_Window</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这里只销毁当前原生窗口，而不调用 <code>glfwTerminate()</code>。因为进程可能创建多个窗口，并且 GLFW 只初始化一次，全局终止应当在更明确的系统关闭阶段处理。当前代码仍保留了将来补充 <code>glfwTerminate()</code> 的 TODO。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Application 构造] --&gt; B[Window::Create]
+    B --&gt; C[WindowsWindow 构造]
+    C --&gt; D[Init]
+    D --&gt; E{GLFW 是否已初始化?}
+    E -- 否 --&gt; F[glfwInit + 错误检查]
+    E -- 是 --&gt; G[跳过全局初始化]
+    F --&gt; H[glfwCreateWindow]
+    G --&gt; H
+    H --&gt; I[glfwMakeContextCurrent]
+    I --&gt; J[保存 WindowData 用户指针]
+    J --&gt; K[SetVSync true]
+</code></pre></div>
+
+<h2 id="11-application">11. 把窗口接入 Application</h2>
+<p><em>(参考时间: 00:23:53)</em></p>
+<p><code>Application</code> 是平台无关层，因此只保存 <code>Window</code> 基类指针：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">Application</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">Application</span><span class="p">();</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="o">~</span><span class="n">Application</span><span class="p">();</span>
+
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">Run</span><span class="p">();</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">Window</span><span class="o">&gt;</span><span class="w"> </span><span class="n">m_Window</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">m_Running</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>构造函数中通过工厂创建窗口：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Application</span><span class="o">::</span><span class="n">Application</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">m_Window</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">Window</span><span class="o">&gt;</span><span class="p">(</span><span class="n">Window</span><span class="o">::</span><span class="n">Create</span><span class="p">());</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><code>std::unique_ptr</code> 明确表达所有权：<code>Application</code> 拥有窗口，并在自身销毁时自动释放。构造顺序也很清晰：</p>
+<div class="highlight"><pre><span></span><code>Application 构造
+  -&gt; Window::Create()
+  -&gt; new WindowsWindow()
+  -&gt; WindowsWindow::Init()
+  -&gt; GLFW 初始化与窗口创建
+</code></pre></div>
+
+<p>原来的事件测试代码被移除，主循环暂时简化为：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">Application::Run</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">m_Running</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">glClearColor</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="w">        </span><span class="n">glClear</span><span class="p">(</span><span class="n">GL_COLOR_BUFFER_BIT</span><span class="p">);</span>
+<span class="w">        </span><span class="n">m_Window</span><span class="o">-&gt;</span><span class="n">OnUpdate</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><code>glClearColor(1, 0, 1, 1)</code> 分别表示红色、绿色、蓝色和 alpha，结果为不透明洋红色。它暂时验证 OpenGL 上下文有效，并让窗口中的清屏结果肉眼可见。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_23_54.png" alt="Application 中使用 unique_ptr 持有 Window 并运行主循环" loading="lazy">
+  <p class="video-caption">📷 Application 中使用 unique_ptr 持有 Window 并运行主循环<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=11&t=1434" target="_blank" rel="noopener">回到原视频 (00:23:54)</a></p>
+</div>
+
+<h2 id="12">12. 第一次运行结果</h2>
+<p><em>(参考时间: 00:25:42)</em></p>
+<p>运行程序后，输出窗口记录了：</p>
+<div class="highlight"><pre><span></span><code>Creating window Hazel Engine (1280, 720)
+</code></pre></div>
+
+<p>屏幕上出现标题为 <code>Hazel Engine</code>、大小为 <code>1280×720</code> 的窗口，内部显示洋红色清屏颜色。这说明：</p>
+<ul>
+<li>Premake 正确生成并链接了 GLFW；</li>
+<li>GLFW 成功初始化；</li>
+<li>原生窗口创建成功；</li>
+<li>OpenGL 上下文有效；</li>
+<li>每帧清屏和缓冲区交换正常工作。</li>
+</ul>
+<p>暂时还不能通过点击关闭按钮结束应用，因为关闭事件尚未转换成 Hazel 的 <code>WindowCloseEvent</code>，主循环中的 <code>m_Running</code> 也还没有被修改。这正是下一讲需要补上的内容。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_27_00.png" alt="OpenGL 上下文成功将窗口背景清为洋红色" loading="lazy">
+  <p class="video-caption">📷 OpenGL 上下文成功将窗口背景清为洋红色<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=11&t=1620" target="_blank" rel="noopener">回到原视频 (00:27:00)</a></p>
+</div>
+
+<h2 id="13">13. 为下一讲预留事件回调</h2>
+<p><em>(参考时间: 00:27:05)</em></p>
+<p><code>Window</code> 已经定义了：</p>
+<div class="highlight"><pre><span></span><code><span class="k">using</span><span class="w"> </span><span class="n">EventCallbackFn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">function</span><span class="o">&lt;</span><span class="kt">void</span><span class="p">(</span><span class="n">Event</span><span class="o">&amp;</span><span class="p">)</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">SetEventCallback</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">EventCallbackFn</span><span class="o">&amp;</span><span class="w"> </span><span class="n">callback</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+</code></pre></div>
+
+<p><code>WindowsWindow</code> 会将这个回调保存在 <code>WindowData.EventCallback</code>。下一讲可以注册 GLFW 的窗口大小、关闭、键盘、鼠标按钮、滚轮和鼠标移动回调，在这些原生回调中：</p>
+<ol>
+<li>通过 <code>glfwGetWindowUserPointer()</code> 找回 <code>WindowData</code>；</li>
+<li>根据 GLFW 参数构造 Hazel 的 <code>Event</code> 子类；</li>
+<li>调用 <code>data.EventCallback(event)</code>；</li>
+<li>由 <code>Application::OnEvent()</code> 使用 <code>EventDispatcher</code> 分发给各层。</li>
+</ol>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant OS as 操作系统 / GLFW
+    participant WW as WindowsWindow
+    participant EV as Hazel Event
+    participant APP as Application
+    participant L as 未来 LayerStack
+
+    OS-&gt;&gt;WW: GLFW 原生回调
+    WW-&gt;&gt;WW: glfwGetWindowUserPointer
+    WW-&gt;&gt;EV: 构造具体 Hazel Event
+    WW-&gt;&gt;APP: EventCallback(event)
+    APP-&gt;&gt;APP: EventDispatcher 分发
+    APP-&gt;&gt;L: 逐层传播 / 可标记 Handled
+</code></pre></div>
+
+<p>视频明确说明，窗口类不应直接依赖 <code>Application</code>。它只依赖 <code>Window</code> 的抽象回调类型，由应用主动注册回调，从而保持模块解耦。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_27_05.png" alt="事件回调接口如何把 Window 与 Application 解耦" loading="lazy">
+  <p class="video-caption">📷 事件回调接口如何把 Window 与 Application 解耦<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=11&t=1625" target="_blank" rel="noopener">回到原视频 (00:27:05)</a></p>
+</div>
+
+<h2 id="14">14. 其他工程调整</h2>
+<p><em>(参考时间: 00:27:50)</em></p>
+<p>日志几乎每个文件都会使用，因此本讲把日志头加入预编译头，减少重复解析和编译开销。</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// hzpch.h</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"Hazel/Log.h"</span>
+</code></pre></div>
+
+<p>另外，应用不再需要上一讲用于测试事件系统的手工 <code>WindowResizeEvent</code> 代码。事件系统本身保留，只是本讲的主循环重点转移到窗口创建和 OpenGL 清屏。</p>
+<h2 id="15">15. 本节结论</h2>
+<p>本讲完成了一个清晰的最小窗口层：</p>
+<ul>
+<li>用 Git 子模块引入 GLFW；</li>
+<li>用 Premake 将 GLFW 作为静态库项目编译并链接；</li>
+<li>定义平台无关的 <code>Window</code> 接口与 <code>WindowProps</code>；</li>
+<li>在 <code>WindowsWindow</code> 中封装 GLFW 和原生窗口指针；</li>
+<li>用 <code>WindowData</code> 为未来 GLFW 事件回调准备用户数据；</li>
+<li>通过工厂函数隐藏平台实现；</li>
+<li>使用断言检查 GLFW 初始化；</li>
+<li>创建 OpenGL 上下文，支持 VSync；</li>
+<li>在 <code>Application</code> 中拥有窗口并驱动每帧更新；</li>
+<li>用洋红色清屏验证图形上下文成功工作。</li>
+</ul>
+<p>这一讲最重要的不是“窗口出现”本身，而是建立了平台抽象的边界。应用只依赖 <code>Window</code>，Windows 细节留在 <code>WindowsWindow</code> 和 <code>Platform/Windows</code> 中。事件回调接口也已经就位于窗口边界，下一讲只需把 GLFW 的原生事件转换为 Hazel 事件。</p>
+<h2 id="_2">附：官方参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=11">Bilibili 精译视频：011 - 窗口抽象与 GLFW</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel">The Cherno 的 Hazel 仓库</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/tree/6815f07cd23eb5cd55cfe6fccaec5aefdc8169e8">本期对应代码提交 <code>6815f07</code></a></li>
+<li><a href="https://github.com/TheCherno/glfw">Cherno 的 GLFW 分支</a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>
