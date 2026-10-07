@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 009：事件系统</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: var(--text-secondary); font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-009">Hazel 游戏引擎笔记 009：事件系统</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9">The Cherno 游戏引擎系列第 9 讲“事件系统”</a>，时长约 35 分 40 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。代码参考提交：<a href="https://github.com/TheCherno/Hazel/tree/34df41651fe88041540f20df845a70642359dc17"><code>34df416</code></a>。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材；术语和代码以原视频及同期 Hazel 仓库为准。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>上一讲完成了事件系统的设计，这一讲开始把设计真正落进 Hazel。由于事件系统涉及的文件和代码量较大，Cherno 改变了系列视频的组织方式：不再从零逐行敲出全部实现，而是把开发分支中已经使用和验证过的代码合并到公开仓库，再通过代码差异逐一解释。</p>
+<p>这种形式把注意力从“如何打字”转向“为什么这样设计”。本节最终会得到一套可运行的阻塞式事件系统，包括：</p>
+<ul>
+<li><code>Event</code> 基类与事件类型、事件分类元数据；</li>
+<li>键盘、鼠标和应用程序事件的具体类型；</li>
+<li>用于减少重复代码的事件宏；</li>
+<li>根据事件类型自动调用处理函数的 <code>EventDispatcher</code>；</li>
+<li>与日志系统、Premake 和应用程序入口的集成；</li>
+<li>一个创建、分类和记录 <code>WindowResizeEvent</code> 的基础测试。</li>
+</ul>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_03_48.png" alt="Hazel 项目中的 Events 文件夹与四个事件文件" loading="lazy">
+  <p class="video-caption">📷 Hazel 项目中的 Events 文件夹与四个事件文件<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9&t=228" target="_blank" rel="noopener">回到原视频 (00:03:48)</a></p>
+</div>
+
+<h2 id="1">1. 为什么需要事件系统</h2>
+<p><em>(参考时间: 00:04:49)</em></p>
+<p>游戏引擎中的窗口、输入设备、渲染器和游戏逻辑经常需要互相通知状态变化，但各模块又不应该彼此紧紧绑定。事件系统提供了一个中间的、统一的通知接口：产生事件的模块只负责描述“发生了什么”，接收方再决定是否关心以及如何处理。</p>
+<p>本节实现的是<strong>阻塞式事件系统</strong>：</p>
+<ul>
+<li>事件发生后立即分发，不进入队列，也不延迟到下一帧；</li>
+<li>一旦事件被处理，当前调用链必须马上完成对应工作；</li>
+<li>事件可以被标记为“已处理”，避免继续传播给下层；</li>
+<li>未来可以选择改造成事件总线或缓冲队列，但当前版本优先保持简单直接。</li>
+</ul>
+<p>阻塞式设计并不意味着事件无法被“消费”。例如当界面按钮收到鼠标点击并确认鼠标位于按钮范围内时，它可以把事件标记为已处理，阻止游戏世界再次收到同一次点击。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[窗口或输入设备产生事件] --&gt; B[封装为具体 Event 对象]
+    B --&gt; C[立即调用 EventDispatcher]
+    C --&gt; D{事件类型是否匹配?}
+    D -- 否 --&gt; E[尝试下一个处理函数]
+    D -- 是 --&gt; F[调用对应处理函数]
+    F --&gt; G{处理函数返回 true?}
+    G -- 是 --&gt; H[标记 m_Handled 并阻止继续传播]
+    G -- 否 --&gt; E
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_04_52.png" alt="事件系统架构说明与阻塞式设计注释" loading="lazy">
+  <p class="video-caption">📷 事件系统架构说明与阻塞式设计注释<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9&t=292" target="_blank" rel="noopener">回到原视频 (00:04:52)</a></p>
+</div>
+
+<h2 id="2">2. 事件元数据：类型与分类</h2>
+<p>事件系统位于 <code>Hazel/src/Hazel/Events</code>，主要有四个文件：</p>
+<ul>
+<li><code>Event.h</code>：事件系统核心，包含事件基类、类型枚举、分类位标志和分发器；</li>
+<li><code>ApplicationEvent.h</code>：窗口关闭、窗口缩放、应用 tick/update/render 等事件；</li>
+<li><code>KeyEvent.h</code>：按键按下、按键释放以及共享的按键基类；</li>
+<li><code>MouseEvent.h</code>：鼠标移动、滚轮、按键按下和释放事件。</li>
+</ul>
+<h3 id="21-eventtype">2.1 EventType 用来判断“这是什么事件”</h3>
+<p><code>EventType</code> 为每一种具体事件分配稳定的整数标识。分发器不需要使用 <code>dynamic_cast</code> 或运行时类型信息，只要比较这个标识，就能知道事件属于哪个具体类型。</p>
+<div class="highlight"><pre><span></span><code><span class="k">enum</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">EventType</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">None</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="n">WindowClose</span><span class="p">,</span><span class="w"> </span><span class="n">WindowResize</span><span class="p">,</span>
+<span class="w">    </span><span class="n">WindowFocus</span><span class="p">,</span><span class="w"> </span><span class="n">WindowLostFocus</span><span class="p">,</span><span class="w"> </span><span class="n">WindowMoved</span><span class="p">,</span>
+<span class="w">    </span><span class="n">AppTick</span><span class="p">,</span><span class="w"> </span><span class="n">AppUpdate</span><span class="p">,</span><span class="w"> </span><span class="n">AppRender</span><span class="p">,</span>
+<span class="w">    </span><span class="n">KeyPressed</span><span class="p">,</span><span class="w"> </span><span class="n">KeyReleased</span><span class="p">,</span>
+<span class="w">    </span><span class="n">MouseButtonPressed</span><span class="p">,</span><span class="w"> </span><span class="n">MouseButtonReleased</span><span class="p">,</span>
+<span class="w">    </span><span class="n">MouseMoved</span><span class="p">,</span><span class="w"> </span><span class="n">MouseScrolled</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>视频里特别指出，鼠标滚动等事件之所以已经出现在代码中，是因为这份实现来自长期使用的开发分支；它比现场临时设计的原型更成熟，也更容易覆盖真实输入场景。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_06_40.png" alt="EventType 枚举与事件类型列表" loading="lazy">
+  <p class="video-caption">📷 EventType 枚举与事件类型列表<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9&t=400" target="_blank" rel="noopener">回到原视频 (00:06:40)</a></p>
+</div>
+
+<h3 id="22-eventcategory">2.2 EventCategory 用来判断“我是否关心这一类事件”</h3>
+<p>仅靠具体类型过滤会非常繁琐。例如一个模块想记录所有鼠标事件，却不想同时写出鼠标移动、滚轮、按钮按下和按钮释放四种判断。事件分类提供了更粗粒度、也更符合调用方意图的过滤方式。</p>
+<p>分类采用位字段，而不是连续的 <code>0、1、2、3</code>。这样同一种事件可以同时属于多个分类：</p>
+<ul>
+<li>按键事件既属于 <code>Keyboard</code>，也属于 <code>Input</code>；</li>
+<li>鼠标事件既属于 <code>Mouse</code>，也属于 <code>Input</code>；</li>
+<li>鼠标按钮事件还可以同时属于 <code>MouseButton</code>；</li>
+<li>窗口缩放和关闭事件属于 <code>Application</code>。</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="cp">#define BIT(x) (1 &lt;&lt; x)</span>
+
+<span class="k">enum</span><span class="w"> </span><span class="nc">EventCategory</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">None</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="n">EventCategoryApplication</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BIT</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+<span class="w">    </span><span class="n">EventCategoryInput</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="n">BIT</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span>
+<span class="w">    </span><span class="n">EventCategoryKeyboard</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="n">BIT</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span>
+<span class="w">    </span><span class="n">EventCategoryMouse</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="n">BIT</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>
+<span class="w">    </span><span class="n">EventCategoryMouseButton</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BIT</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>判断分类时只需要进行按位与运算：</p>
+<div class="highlight"><pre><span></span><code><span class="kr">inline</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="nf">IsInCategory</span><span class="p">(</span><span class="n">EventCategory</span><span class="w"> </span><span class="n">category</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">GetCategoryFlags</span><span class="p">()</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">category</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>结果为零表示不属于该分类；任何非零值都表示至少属于该分类。事件当然可以同时属于更多分类。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_08_54.png" alt="事件分类位字段与 BIT 宏" loading="lazy">
+  <p class="video-caption">📷 事件分类位字段与 BIT 宏<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9&t=534" target="_blank" rel="noopener">回到原视频 (00:08:54)</a></p>
+</div>
+
+<h2 id="3-event">3. Event 基类</h2>
+<p><code>Event</code> 是所有具体事件的公共基类，主要承担三类职责：</p>
+<ol>
+<li>暴露事件类型、名称和分类查询接口；</li>
+<li>保存 <code>m_Handled</code> 状态，支持事件消费和传播控制；</li>
+<li>提供默认字符串输出，必要时允许具体事件补充详情。</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">Event</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">friend</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">EventDispatcher</span><span class="p">;</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="n">EventType</span><span class="w"> </span><span class="n">GetEventType</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="nf">GetName</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">GetCategoryFlags</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="nf">ToString</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">GetName</span><span class="p">();</span><span class="w"> </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="nf">IsInCategory</span><span class="p">(</span><span class="n">EventCategory</span><span class="w"> </span><span class="n">category</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">GetCategoryFlags</span><span class="p">()</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">category</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="k">protected</span><span class="o">:</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">m_Handled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<h3 id="31">3.1 纯虚接口保证每种事件都完整</h3>
+<p><code>GetEventType</code>、<code>GetName</code> 和 <code>GetCategoryFlags</code> 是纯虚函数。任何可以直接实例化的事件类型都必须提供这些信息，否则无法通过编译。</p>
+<p><code>GetName</code> 返回的是 <code>const char*</code>，并不是动态分配的字符串。事件名称主要服务于调试和日志，不应出现在游戏运行时的热路径中。</p>
+<h3 id="32-tostring">3.2 ToString 是调试接口</h3>
+<p>默认实现只返回事件名称。带数据的事件可以重写它，让日志包含更有诊断价值的信息：</p>
+<ul>
+<li><code>WindowResizeEvent</code> 输出新的宽度和高度；</li>
+<li><code>KeyPressedEvent</code> 输出键码和重复次数；</li>
+<li><code>MouseMovedEvent</code> 输出鼠标坐标；</li>
+<li><code>MouseScrolledEvent</code> 输出水平和垂直滚动偏移。</li>
+</ul>
+<p>格式化会使用 <code>std::stringstream</code>，可能发生内存分配，因此它只应该用于排错，不应该成为游戏运行逻辑的一部分。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_09_53.png" alt="Event 基类、m_Handled 与分类判断" loading="lazy">
+  <p class="video-caption">📷 Event 基类、m_Handled 与分类判断<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9&t=593" target="_blank" rel="noopener">回到原视频 (00:09:53)</a></p>
+</div>
+
+<h2 id="4">4. 具体事件类型</h2>
+<h3 id="41">4.1 键盘事件与按键重复</h3>
+<p>键盘事件有一个共同数据：按下的键码。因此代码先建立 <code>KeyEvent</code> 基类保存 <code>m_KeyCode</code>，再由 <code>KeyPressedEvent</code> 和 <code>KeyReleasedEvent</code> 派生。</p>
+<p><code>KeyEvent</code> 的构造函数是 <code>protected</code>，表示它可以作为继承层次中的公共实现，但不应被直接实例化。</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">KeyEvent</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">Event</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">GetKeyCode</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">m_KeyCode</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">EVENT_CLASS_CATEGORY</span><span class="p">(</span><span class="n">EventCategoryKeyboard</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">EventCategoryInput</span><span class="p">)</span>
+<span class="k">protected</span><span class="o">:</span>
+<span class="w">    </span><span class="n">KeyEvent</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">keycode</span><span class="p">)</span>
+<span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="n">m_KeyCode</span><span class="p">(</span><span class="n">keycode</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">m_KeyCode</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>按键按下事件还保存 <code>repeatCount</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">KeyPressedEvent</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">KeyEvent</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">KeyPressedEvent</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">keycode</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">repeatCount</span><span class="p">)</span>
+<span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="n">KeyEvent</span><span class="p">(</span><span class="n">keycode</span><span class="p">),</span><span class="w"> </span><span class="n">m_RepeatCount</span><span class="p">(</span><span class="n">repeatCount</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">GetRepeatCount</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">m_RepeatCount</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">EVENT_CLASS_TYPE</span><span class="p">(</span><span class="n">KeyPressed</span><span class="p">)</span>
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">m_RepeatCount</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p><code>repeatCount == 0</code> 表示用户刚刚按下按键；随后系统可能继续发送重复事件。这个差异对菜单选择非常重要：若只处理第一次按下，用户按住方向键时可能只移动一次；若不加区分地连续处理，按住键又会高速循环。</p>
+<p>利用重复计数，可以明确区分“开始移动”和“连续移动”，或在菜单中等待系统自带的首次重复延迟。视频中的终端演示清楚地展示了：第一次出现字母 <code>A</code> 后有一次停顿，随后才出现连续重复。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_14_54.png" alt="按住 A 键时首次按下与连续重复的终端效果" loading="lazy">
+  <p class="video-caption">📷 按住 A 键时首次按下与连续重复的终端效果<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9&t=894" target="_blank" rel="noopener">回到原视频 (00:14:54)</a></p>
+</div>
+
+<p><code>KeyReleasedEvent</code> 的结构更简单，只需要记录哪一个键被释放：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">KeyReleasedEvent</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">KeyEvent</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">KeyReleasedEvent</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">keycode</span><span class="p">)</span>
+<span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="n">KeyEvent</span><span class="p">(</span><span class="n">keycode</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="w">    </span><span class="n">EVENT_CLASS_TYPE</span><span class="p">(</span><span class="n">KeyReleased</span><span class="p">)</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_15_45.png" alt="KeyEvent、KeyPressedEvent 与重复计数实现" loading="lazy">
+  <p class="video-caption">📷 KeyEvent、KeyPressedEvent 与重复计数实现<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9&t=945" target="_blank" rel="noopener">回到原视频 (00:15:45)</a></p>
+</div>
+
+<h3 id="42">4.2 鼠标事件</h3>
+<p><code>MouseMovedEvent</code> 保存当前鼠标的 <code>x</code>、<code>y</code> 坐标：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">MouseMovedEvent</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">Event</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">MouseMovedEvent</span><span class="p">(</span><span class="kt">float</span><span class="w"> </span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">y</span><span class="p">)</span>
+<span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="n">m_MouseX</span><span class="p">(</span><span class="n">x</span><span class="p">),</span><span class="w"> </span><span class="n">m_MouseY</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">GetX</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">m_MouseX</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">GetY</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">m_MouseY</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">EVENT_CLASS_TYPE</span><span class="p">(</span><span class="n">MouseMoved</span><span class="p">)</span>
+<span class="w">    </span><span class="n">EVENT_CLASS_CATEGORY</span><span class="p">(</span><span class="n">EventCategoryMouse</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">EventCategoryInput</span><span class="p">)</span>
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">m_MouseX</span><span class="p">,</span><span class="w"> </span><span class="n">m_MouseY</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>滚轮事件同时保存水平和垂直偏移。部分鼠标或触控板具备横向滚动能力，因此不能只记录传统的 <code>yOffset</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">MouseScrolledEvent</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">Event</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">MouseScrolledEvent</span><span class="p">(</span><span class="kt">float</span><span class="w"> </span><span class="n">xOffset</span><span class="p">,</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">yOffset</span><span class="p">)</span>
+<span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="n">m_XOffset</span><span class="p">(</span><span class="n">xOffset</span><span class="p">),</span><span class="w"> </span><span class="n">m_YOffset</span><span class="p">(</span><span class="n">yOffset</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">GetXOffset</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">m_XOffset</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">GetYOffset</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">m_YOffset</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">EVENT_CLASS_TYPE</span><span class="p">(</span><span class="n">MouseScrolled</span><span class="p">)</span>
+<span class="w">    </span><span class="n">EVENT_CLASS_CATEGORY</span><span class="p">(</span><span class="n">EventCategoryMouse</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">EventCategoryInput</span><span class="p">)</span>
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">m_XOffset</span><span class="p">,</span><span class="w"> </span><span class="n">m_YOffset</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_22_56.png" alt="MouseMovedEvent 与鼠标坐标实现" loading="lazy">
+  <p class="video-caption">📷 MouseMovedEvent 与鼠标坐标实现<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9&t=1376" target="_blank" rel="noopener">回到原视频 (00:22:56)</a></p>
+</div>
+
+<p>鼠标按钮也采用继承结构。<code>MouseButtonEvent</code> 保存按钮编号，按钮按下和释放事件共享这一部分：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">MouseButtonEvent</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">Event</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">GetMouseButton</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">m_Button</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">EVENT_CLASS_CATEGORY</span><span class="p">(</span><span class="n">EventCategoryMouse</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">EventCategoryInput</span><span class="p">)</span>
+<span class="k">protected</span><span class="o">:</span>
+<span class="w">    </span><span class="n">MouseButtonEvent</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">button</span><span class="p">)</span>
+<span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="n">m_Button</span><span class="p">(</span><span class="n">button</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">m_Button</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>随后分别实现 <code>MouseButtonPressedEvent</code> 与 <code>MouseButtonReleasedEvent</code>。它们拥有自己的事件类型，并通过基类共享按钮数据。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_24_34.png" alt="鼠标按钮基类与按下、释放事件" loading="lazy">
+  <p class="video-caption">📷 鼠标按钮基类与按下、释放事件<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9&t=1474" target="_blank" rel="noopener">回到原视频 (00:24:34)</a></p>
+</div>
+
+<h3 id="43">4.3 应用程序事件</h3>
+<p><code>WindowCloseEvent</code> 不含额外数据，只表示窗口即将关闭：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">WindowCloseEvent</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">Event</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">WindowCloseEvent</span><span class="p">()</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="w">    </span><span class="n">EVENT_CLASS_TYPE</span><span class="p">(</span><span class="n">WindowClose</span><span class="p">)</span>
+<span class="w">    </span><span class="n">EVENT_CLASS_CATEGORY</span><span class="p">(</span><span class="n">EventCategoryApplication</span><span class="p">)</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p><code>WindowResizeEvent</code> 则记录缩放后的宽高：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">WindowResizeEvent</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">Event</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">WindowResizeEvent</span><span class="p">(</span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">width</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">height</span><span class="p">)</span>
+<span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="n">m_Width</span><span class="p">(</span><span class="n">width</span><span class="p">),</span><span class="w"> </span><span class="n">m_Height</span><span class="p">(</span><span class="n">height</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">GetWidth</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">m_Width</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">GetHeight</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">m_Height</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">EVENT_CLASS_TYPE</span><span class="p">(</span><span class="n">WindowResize</span><span class="p">)</span>
+<span class="w">    </span><span class="n">EVENT_CLASS_CATEGORY</span><span class="p">(</span><span class="n">EventCategoryApplication</span><span class="p">)</span>
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">m_Width</span><span class="p">,</span><span class="w"> </span><span class="n">m_Height</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>同一文件中还定义了 <code>AppTickEvent</code>、<code>AppUpdateEvent</code> 和 <code>AppRenderEvent</code>。不过 Cherno 表示自己还没有完全决定是否要使用它们：这些调用是应用程序固有的主循环阶段，强行包装成事件未必比直接调用更合理。因此它们暂时保留为备选设计，而不是立即进入核心流程。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_24_56.png" alt="窗口缩放、关闭以及应用循环事件" loading="lazy">
+  <p class="video-caption">📷 窗口缩放、关闭以及应用循环事件<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9&t=1496" target="_blank" rel="noopener">回到原视频 (00:24:56)</a></p>
+</div>
+
+<p>事件类的整体继承关系可以概括为：</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    E[Event] --&gt; A[ApplicationEvent]
+    E --&gt; K[KeyEvent]
+    E --&gt; M[MouseEvent]
+    A --&gt; WC[WindowCloseEvent]
+    A --&gt; WR[WindowResizeEvent]
+    A --&gt; TU[AppTick / Update / Render]
+    K --&gt; KP[KeyPressedEvent]
+    K --&gt; KR[KeyReleasedEvent]
+    M --&gt; MM[MouseMovedEvent]
+    M --&gt; MS[MouseScrolledEvent]
+    M --&gt; MB[MouseButtonEvent]
+    MB --&gt; MBP[MouseButtonPressedEvent]
+    MB --&gt; MBR[MouseButtonReleasedEvent]
+</code></pre></div>
+
+<h2 id="5">5. 用宏消除事件类的重复代码</h2>
+<p>每种具体事件都要提供三个看似固定、但实现细节略有不同的成员：</p>
+<ul>
+<li>一个静态的 <code>GetStaticType()</code>；</li>
+<li>一个虚函数 <code>GetEventType()</code>，返回对应的静态类型；</li>
+<li>一个 <code>GetName()</code>，用于调试。</li>
+</ul>
+<p>逐个手写既冗长又容易出错，因此使用 <code>EVENT_CLASS_TYPE</code> 宏统一生成：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#define EVENT_CLASS_TYPE(type)                                              \</span>
+<span class="cp">    static EventType GetStaticType() { return EventType::type; }            \</span>
+<span class="cp">    virtual EventType GetEventType() const override                         \</span>
+<span class="cp">    { return GetStaticType(); }                                             \</span>
+<span class="cp">    virtual const char* GetName() const override { return #type; }</span>
+</code></pre></div>
+
+<p>分类则通过另一个宏写入：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#define EVENT_CLASS_CATEGORY(category)                                      \</span>
+<span class="cp">    virtual int GetCategoryFlags() const override { return category; }</span>
+</code></pre></div>
+
+<p>调用方只需要写：</p>
+<div class="highlight"><pre><span></span><code><span class="n">EVENT_CLASS_TYPE</span><span class="p">(</span><span class="n">KeyPressed</span><span class="p">)</span>
+<span class="n">EVENT_CLASS_CATEGORY</span><span class="p">(</span><span class="n">EventCategoryKeyboard</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">EventCategoryInput</span><span class="p">)</span>
+</code></pre></div>
+
+<p>为什么同时需要静态的 <code>GetStaticType()</code> 和虚的 <code>GetEventType()</code>？</p>
+<ul>
+<li>静态函数可以直接通过类型名调用，不需要先创建对象；</li>
+<li>虚函数允许通过 <code>Event&amp;</code> 或 <code>Event*</code> 查询多态对象的真实类型；</li>
+<li>分发器正好利用前者判断模板类型，利用后者检查当前事件对象。</li>
+</ul>
+<p>静态函数提供编译期已知的类型标识，虚函数再把这套标识暴露给运行时基类引用，两者一起构成分发器的类型判断基础。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_18_26.png" alt="EVENT_CLASS_TYPE 与分类宏的实现" loading="lazy">
+  <p class="video-caption">📷 EVENT_CLASS_TYPE 与分类宏的实现<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9&t=1106" target="_blank" rel="noopener">回到原视频 (00:18:26)</a></p>
+</div>
+
+<h2 id="6-eventdispatcher">6. EventDispatcher：让分发代码保持简洁</h2>
+<p>事件系统最直接的用法是写出一连串判断：</p>
+<div class="highlight"><pre><span></span><code><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="p">.</span><span class="n">GetEventType</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EventType</span><span class="o">::</span><span class="n">WindowResize</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">resizeEvent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">WindowResizeEvent</span><span class="o">&amp;&gt;</span><span class="p">(</span><span class="n">event</span><span class="p">);</span>
+<span class="w">    </span><span class="n">OnWindowResize</span><span class="p">(</span><span class="n">resizeEvent</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="p">.</span><span class="n">GetEventType</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EventType</span><span class="o">::</span><span class="n">KeyPressed</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">keyEvent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">KeyPressedEvent</span><span class="o">&amp;&gt;</span><span class="p">(</span><span class="n">event</span><span class="p">);</span>
+<span class="w">    </span><span class="n">OnKeyPressed</span><span class="p">(</span><span class="n">keyEvent</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这种调用端代码重复度高，而且类型判断和强制转换容易写错。<code>EventDispatcher</code> 把这一套模式封装起来：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">EventDispatcher</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">template</span><span class="o">&lt;</span><span class="k">typename</span><span class="w"> </span><span class="nc">T</span><span class="o">&gt;</span>
+<span class="w">    </span><span class="k">using</span><span class="w"> </span><span class="n">EventFn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">function</span><span class="o">&lt;</span><span class="kt">bool</span><span class="p">(</span><span class="n">T</span><span class="o">&amp;</span><span class="p">)</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">EventDispatcher</span><span class="p">(</span><span class="n">Event</span><span class="o">&amp;</span><span class="w"> </span><span class="n">event</span><span class="p">)</span>
+<span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="n">m_Event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">template</span><span class="o">&lt;</span><span class="k">typename</span><span class="w"> </span><span class="nc">T</span><span class="o">&gt;</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">Dispatch</span><span class="p">(</span><span class="n">EventFn</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span><span class="w"> </span><span class="n">func</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">m_Event</span><span class="p">.</span><span class="n">GetEventType</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">T</span><span class="o">::</span><span class="n">GetStaticType</span><span class="p">())</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="n">m_Event</span><span class="p">.</span><span class="n">m_Handled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">T</span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">m_Event</span><span class="p">);</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="n">Event</span><span class="o">&amp;</span><span class="w"> </span><span class="n">m_Event</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>分发过程只有四步：</p>
+<ol>
+<li>比较当前事件的运行时类型和模板参数 <code>T</code> 的静态类型；</li>
+<li>若不一致，直接返回 <code>false</code>；</li>
+<li>若一致，把基类引用转换为具体事件类型并调用处理函数；</li>
+<li>用处理函数的返回值更新 <code>m_Handled</code>。</li>
+</ol>
+<p>调用方可以连续注册多个处理分支：</p>
+<div class="highlight"><pre><span></span><code><span class="n">EventDispatcher</span><span class="w"> </span><span class="nf">dispatcher</span><span class="p">(</span><span class="n">e</span><span class="p">);</span>
+<span class="n">dispatcher</span><span class="p">.</span><span class="n">Dispatch</span><span class="o">&lt;</span><span class="n">WindowResizeEvent</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">    </span><span class="p">[](</span><span class="n">WindowResizeEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">OnWindowResize</span><span class="p">(</span><span class="n">event</span><span class="p">);</span>
+<span class="w">    </span><span class="p">});</span>
+</code></pre></div>
+
+<p>处理函数返回 <code>true</code> 时，事件被标记为已处理，可用于阻止事件继续向其他层传播。尽管当前实现使用 <code>std::function</code> 和 C 风格指针转换，接口对客户端仍然足够直观，也把类型判断和具体类型转换集中在一个地方。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_21_06.png" alt="EventDispatcher 的类型判断与分发逻辑" loading="lazy">
+  <p class="video-caption">📷 EventDispatcher 的类型判断与分发逻辑<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9&t=1266" target="_blank" rel="noopener">回到原视频 (00:21:06)</a></p>
+</div>
+
+<h2 id="7">7. 与现有工程的集成</h2>
+<h3 id="71-premake">7.1 Premake 配置</h3>
+<p>本次工程配置修改集中在两个方面：</p>
+<ul>
+<li>使用 Premake 的 <code>"latest"</code> 系统版本，避免硬编码 Windows SDK 版本；</li>
+<li>将 Hazel 的 <code>src</code> 目录加入包含路径，使代码可以统一写 <code>Hazel/...</code>。</li>
+</ul>
+<p>统一包含路径后，事件文件不需要计算“从当前目录回退几层”。即使文件以后移动到别的子目录，包含路径也不必逐个修改。</p>
+<div class="highlight"><pre><span></span><code><span class="nv">includedirs</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="s2">"%{prj.name}/src"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"%{prj.name}/vendor/spdlog/include"</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>修改 Premake 文件后还需要重新生成 Visual Studio 工程，因此项目文件本身也会出现在差异中。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_29_55.png" alt="使用系统最新版本并统一源码包含路径" loading="lazy">
+  <p class="video-caption">📷 使用系统最新版本并统一源码包含路径<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9&t=1795" target="_blank" rel="noopener">回到原视频 (00:29:55)</a></p>
+</div>
+
+<h3 id="72-coreh">7.2 Core.h 增加位标志宏</h3>
+<p><code>BIT(x)</code> 把数字 <code>1</code> 左移 <code>x</code> 位，为事件分类提供互不重叠的二进制位：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#define BIT(x) (1 &lt;&lt; x)</span>
+</code></pre></div>
+
+<p>每个分类只占用一位，因此多个分类可以通过按位或组合，也可以低成本地做交集判断。</p>
+<h3 id="73-event">7.3 让日志系统支持 Event</h3>
+<p>为了让 <code>HZ_TRACE(e)</code> 这样的代码直接把事件传给 spdlog，<code>Log.h</code> 增加了 spdlog 的自定义类型输出支持：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"spdlog/fmt/ostr.h"</span>
+</code></pre></div>
+
+<p><code>Event</code> 又提供了全局输出流运算符，因此日志系统可以自动调用 <code>ToString()</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="kr">inline</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">ostream</span><span class="o">&amp;</span><span class="w"> </span><span class="k">operator</span><span class="o">&lt;&lt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">ostream</span><span class="o">&amp;</span><span class="w"> </span><span class="n">os</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">Event</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">os</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">ToString</span><span class="p">();</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这表明字符串输出只承担调试职责，不进入事件系统的核心数据路径。</p>
+<h3 id="74-application">7.4 在 Application 中创建测试事件</h3>
+<p>为了验证事件创建、分类和日志链路，<code>Application::Run()</code> 先手工创建一个窗口缩放事件：</p>
+<div class="highlight"><pre><span></span><code><span class="n">WindowResizeEvent</span><span class="w"> </span><span class="nf">e</span><span class="p">(</span><span class="mi">1280</span><span class="p">,</span><span class="w"> </span><span class="mi">720</span><span class="p">);</span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">e</span><span class="p">.</span><span class="n">IsInCategory</span><span class="p">(</span><span class="n">EventCategoryApplication</span><span class="p">))</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">HZ_TRACE</span><span class="p">(</span><span class="n">e</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">e</span><span class="p">.</span><span class="n">IsInCategory</span><span class="p">(</span><span class="n">EventCategoryInput</span><span class="p">))</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">HZ_TRACE</span><span class="p">(</span><span class="n">e</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_31_11.png" alt="Application.cpp 中的窗口缩放事件测试" loading="lazy">
+  <p class="video-caption">📷 Application.cpp 中的窗口缩放事件测试<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9&t=1871" target="_blank" rel="noopener">回到原视频 (00:31:11)</a></p>
+</div>
+
+<p>这个例子故意检查两个分类：</p>
+<ul>
+<li>它属于 <code>Application</code>，所以第一次日志会被执行；</li>
+<li>它不属于 <code>Input</code>，所以条件为假，不会重复输出；</li>
+<li>如果两个条件都成立，同一个事件可能被记录两次，这正是分类过滤需要明确表达意图的原因。</li>
+</ul>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_31_54.png" alt="运行测试后只输出一次 WindowResizeEvent" loading="lazy">
+  <p class="video-caption">📷 运行测试后只输出一次 WindowResizeEvent<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9&t=1914" target="_blank" rel="noopener">回到原视频 (00:31:54)</a></p>
+</div>
+
+<h2 id="8">8. 当前限制与下一步</h2>
+<p>本节完成的是事件系统的第一阶段。它已经能描述事件、携带数据、判断分类、分发处理并阻止传播，但仍有三项明确边界。</p>
+<p>第一，事件是阻塞且即时处理的。系统没有事件队列、缓冲或延迟分发，因此某一个处理函数耗费时间时，会直接影响产生事件时的调用链。</p>
+<p>第二，当前系统只负责“通知发生了什么”，还不能回答“此刻某个输入是否持续按下”。输入状态需要额外保存按钮或按键的当前状态，Cherno 把这项工作规划给未来的 Input Manager。</p>
+<p>第三，<code>AppTickEvent</code>、<code>AppUpdateEvent</code> 和 <code>AppRenderEvent</code> 仍是待定设计。它们与应用程序主循环紧密相关，也许直接调用更合适，因此暂时不会强行事件化。</p>
+<p>下一步计划是先引入预编译头，减少公共标准库和第三方头文件带来的重复编译，再实现真正的窗口类。窗口接入后，本节创建的键盘、鼠标和窗口事件才会进入实际运行路径。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_34_23.png" alt="后续规划：预编译头、窗口类与输入系统" loading="lazy">
+  <p class="video-caption">📷 后续规划：预编译头、窗口类与输入系统<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9&t=2063" target="_blank" rel="noopener">回到原视频 (00:34:23)</a></p>
+</div>
+
+<h2 id="9">9. 本节结论</h2>
+<p>这一讲建立了一个足够小、但结构完整的事件系统骨架：</p>
+<ul>
+<li>用 <code>EventType</code> 标识具体类型；</li>
+<li>用位字段 <code>EventCategory</code> 表达多个正交分类；</li>
+<li>用基类和继承共享键盘、鼠标、应用程序事件的公共数据；</li>
+<li>用宏消除事件元数据样板；</li>
+<li>用 <code>m_Handled</code> 控制事件消费和传播；</li>
+<li>用 <code>EventDispatcher</code> 降低客户端的类型判断复杂度；</li>
+<li>用日志输出运算符把自定义事件接入 spdlog。</li>
+</ul>
+<p>最重要的设计原则不是“所有东西都必须变成事件”，而是根据模块边界和职责选择合适机制。事件适合通知状态变化和输入发生；主循环阶段和持续输入状态则可能需要更直接的调用或专门管理器。</p>
+<h2 id="_2">附：官方参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=9">Bilibili 精译视频：009 - 事件系统</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel">The Cherno 的 Hazel 仓库</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/tree/34df41651fe88041540f20df845a70642359dc17">本期对应代码提交 <code>34df416</code></a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>
