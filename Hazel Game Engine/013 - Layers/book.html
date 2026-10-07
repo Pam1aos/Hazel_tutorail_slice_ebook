@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 013：图层与 LayerStack</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: var(--text-secondary); font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-013-layerstack">Hazel 游戏引擎笔记 013：图层与 LayerStack</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=13">The Cherno 游戏引擎系列第 13 讲“图层”</a>，时长约 22 分 59 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。代码参考提交：<a href="https://github.com/TheCherno/Hazel/tree/5bd809312a266c23d13d84dcd08a833a526aa264"><code>5bd8093</code></a>。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材；术语和代码以原视频及同期 Hazel 仓库为准。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>上一讲把 GLFW 窗口事件接入了 Hazel。本节引入一个新的基础抽象：<strong>Layer</strong>，以及负责管理多个 Layer 的 <strong>LayerStack</strong>。</p>
+<p>Layer 不只是绘制顺序。它同时影响：</p>
+<ul>
+<li>每帧更新顺序；</li>
+<li>渲染顺序；</li>
+<li>事件接收顺序；</li>
+<li>应用不同功能模块的边界；</li>
+<li>事件是否继续向下一层传播。</li>
+</ul>
+<p>本节会实现：</p>
+<ul>
+<li><code>Layer</code> 的生命周期与更新、事件虚函数；</li>
+<li><code>LayerStack</code> 的普通层和 Overlay 插入规则；</li>
+<li><code>Application</code> 对 LayerStack 的拥有与转发；</li>
+<li><code>PushLayer()</code>、<code>PushOverlay()</code> 和反向事件传播；</li>
+<li>客户端 <code>ExampleLayer</code>；</li>
+<li>修复 DLL 与 Sandbox 使用不同 C++ 运行时堆导致的崩溃问题。</li>
+</ul>
+<h2 id="1-layer">1. Layer 是什么</h2>
+<p><em>(参考时间: 00:01:18)</em></p>
+<p>Cherno 用 Photoshop 图层作类比：图层可以理解为一个有序集合，每一层包含一部分内容，顺序决定它们如何叠加。</p>
+<p>在游戏引擎中，Layer 通常是一个相对独立的应用模块，例如：</p>
+<ul>
+<li>3D 游戏世界层：保存场景并执行主要渲染；</li>
+<li>游戏调试层：绘制碰撞区域、命中框和调试几何体；</li>
+<li>UI 层：使用正交投影绘制按钮、菜单和 HUD；</li>
+<li>调试 UI 层：承载 ImGui 等工具界面；</li>
+<li>编辑器和工具层：仅在开发或内部构建中启用。</li>
+</ul>
+<p>Layer 是一个抽象概念。它本身不规定“必须绘制什么”或“必须处理什么事件”，而是提供统一的调用入口，由子类决定具体行为。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Application] --&gt; B[LayerStack]
+    B --&gt; C[3D Game Layer]
+    B --&gt; D[World Debug Layer]
+    B --&gt; E[UI Layer]
+    B --&gt; F[ImGui Overlay]
+</code></pre></div>
+
+<h2 id="2">2. 更新与事件使用相反的顺序</h2>
+<p><em>(参考时间: 00:02:11)</em></p>
+<p>LayerStack 是一个有序列表。Update 和渲染从底部到顶部，也就是从 <code>begin()</code> 到 <code>end()</code>：</p>
+<div class="highlight"><pre><span></span><code>底层游戏世界
+  -&gt; 世界调试层
+  -&gt; UI 层
+  -&gt; Overlay
+</code></pre></div>
+
+<p>这样后面的层可以覆盖前面层绘制的内容。Overlay 永远排在普通层之后，因此最后渲染并显示在最上方。</p>
+<p>事件传播方向相反。鼠标点击最先落到用户看到的顶层，因此事件从 <code>end()</code> 向 <code>begin()</code> 反向传播：</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    subgraph Update[Update / Render 正向]
+        U1[Game Layer] --&gt; U2[Debug Layer]
+        U2 --&gt; U3[UI Layer]
+        U3 --&gt; U4[Overlay]
+    end
+
+    subgraph Events[Event 反向]
+        E4[Overlay] --&gt; E3[UI Layer]
+        E3 --&gt; E2[Debug Layer]
+        E2 --&gt; E1[Game Layer]
+    end
+</code></pre></div>
+
+<p>如果一个 UI 按钮已经处理了点击事件，事件会标记为 <code>Handled</code>，传播立即停止，游戏世界不会再把同一次点击当成开火、选择或其他操作。这正是 LayerStack 对事件顺序最实用的价值。</p>
+<h2 id="3-layer">3. Layer 接口</h2>
+<p><em>(参考时间: 00:08:07)</em></p>
+<p><code>Layer.h</code> 定义一个可供客户端继承的基类：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">Layer</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">Layer</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"Layer"</span><span class="p">);</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="o">~</span><span class="n">Layer</span><span class="p">();</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">OnAttach</span><span class="p">()</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">OnDetach</span><span class="p">()</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">OnUpdate</span><span class="p">()</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">OnEvent</span><span class="p">(</span><span class="n">Event</span><span class="o">&amp;</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="nf">GetName</span><span class="p">()</span><span class="w"> </span><span class="k">const</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">m_DebugName</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="k">protected</span><span class="o">:</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">m_DebugName</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<h3 id="31-debugname">3.1 DebugName</h3>
+<p>名字只是调试标识，默认是 <code>"Layer"</code>。Layer 不应该依靠名字互相查找或通信；模块之间应使用明确的 API 或事件。</p>
+<h3 id="32">3.2 生命周期</h3>
+<p><code>OnAttach()</code> 和 <code>OnDetach()</code> 类似初始化与清理：</p>
+<ul>
+<li>Layer 被加入应用并开始参与运行时调用 <code>OnAttach()</code>；</li>
+<li>Layer 被移出应用时调用 <code>OnDetach()</code>。</li>
+</ul>
+<h3 id="33">3.3 每帧更新</h3>
+<p><code>OnUpdate()</code> 由应用的主循环调用，通常每帧一次。游戏逻辑、动画更新和渲染都可以从这里进入。</p>
+<h3 id="34">3.4 事件入口</h3>
+<p><code>OnEvent(Event&amp;)</code> 接收窗口和其他模块产生的事件。若某个 Layer 处理了事件，应通过 <code>EventDispatcher</code> 把事件标记为已处理。</p>
+<p>所有回调默认都是空实现，子类只重写需要的部分。</p>
+<p>实现文件负责保存调试名：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Layer</span><span class="o">::</span><span class="n">Layer</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">debugName</span><span class="p">)</span>
+<span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="n">m_DebugName</span><span class="p">(</span><span class="n">debugName</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="p">}</span>
+
+<span class="n">Layer</span><span class="o">::~</span><span class="n">Layer</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>虚析构函数是必需的，因为 Layer 通常通过基类指针销毁。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_09_08.png" alt="Layer 基类的名称、生命周期、更新和事件回调" loading="lazy">
+  <p class="video-caption">📷 Layer 基类的名称、生命周期、更新和事件回调<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=13&t=548" target="_blank" rel="noopener">回到原视频 (00:09:08)</a></p>
+</div>
+
+<h3 id="35">3.5 暂未加入启停功能</h3>
+<p>视频讨论了 Layer 的启用和禁用：可以给 Layer 或 LayerStack 增加布尔状态，使禁用层不更新、不渲染，也不接收事件。但本节故意没有加入，以免一次引入过多复杂度。</p>
+<h2 id="4-layerstack">4. LayerStack 数据结构</h2>
+<p><em>(参考时间: 00:10:49)</em></p>
+<p>LayerStack 本质上封装了 <code>std::vector&lt;Layer*&gt;</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">LayerStack</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">LayerStack</span><span class="p">();</span>
+<span class="w">    </span><span class="o">~</span><span class="n">LayerStack</span><span class="p">();</span>
+
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">PushLayer</span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">layer</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">PushOverlay</span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">overlay</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">PopLayer</span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">layer</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">PopOverlay</span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">overlay</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Layer</span><span class="o">*&gt;::</span><span class="n">iterator</span><span class="w"> </span><span class="n">begin</span><span class="p">()</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">m_Layers</span><span class="p">.</span><span class="n">begin</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Layer</span><span class="o">*&gt;::</span><span class="n">iterator</span><span class="w"> </span><span class="n">end</span><span class="p">()</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">m_Layers</span><span class="p">.</span><span class="n">end</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Layer</span><span class="o">*&gt;</span><span class="w"> </span><span class="n">m_Layers</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Layer</span><span class="o">*&gt;::</span><span class="n">iterator</span><span class="w"> </span><span class="n">m_LayerInsert</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>为什么使用 <code>vector</code>，而不是真正的栈？</p>
+<ul>
+<li>每帧需要从底到顶顺序遍历；</li>
+<li>事件需要反向遍历；</li>
+<li>Overlay 要插入到普通层之后，而不是简单压入栈顶；</li>
+<li>连续存储有利于频繁迭代。</li>
+</ul>
+<p><code>m_LayerInsert</code> 指向“普通层区域”的下一个插入位置，也就是普通层和 Overlay 的分界。</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[begin] --&gt; B[普通 Layer 1]
+    B --&gt; C[普通 Layer 2]
+    C --&gt; D[m_LayerInsert]
+    D --&gt; E[Overlay 1]
+    E --&gt; F[Overlay 2]
+    F --&gt; G[end]
+</code></pre></div>
+
+<h3 id="41">4.1 插入普通层</h3>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">LayerStack::PushLayer</span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">layer</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">m_LayerInsert</span><span class="w"> </span><span class="o">=</span>
+<span class="w">        </span><span class="n">m_Layers</span><span class="p">.</span><span class="n">emplace</span><span class="p">(</span><span class="n">m_LayerInsert</span><span class="p">,</span><span class="w"> </span><span class="n">layer</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><code>emplace()</code> 在分界位置插入新 Layer，并返回指向新元素的迭代器。因此再添加普通层时仍会插在 Overlay 之前。</p>
+<h3 id="42-overlay">4.2 插入 Overlay</h3>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">LayerStack::PushOverlay</span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">overlay</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">m_Layers</span><span class="p">.</span><span class="n">emplace_back</span><span class="p">(</span><span class="n">overlay</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Overlay 总是追加到最末尾。无论普通层何时加入，Overlay 都保持在最后并优先接收事件。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_13_11.png" alt="Layer 插入位置与 Overlay 末尾插入规则" loading="lazy">
+  <p class="video-caption">📷 Layer 插入位置与 Overlay 末尾插入规则<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=13&t=791" target="_blank" rel="noopener">回到原视频 (00:13:11)</a></p>
+</div>
+
+<h2 id="5-layer">5. Layer 的所有权</h2>
+<p><em>(参考时间: 00:12:04)</em></p>
+<p>LayerStack 接收的是原始指针，并拥有加入其中的 Layer：</p>
+<div class="highlight"><pre><span></span><code><span class="n">LayerStack</span><span class="o">::~</span><span class="n">LayerStack</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">layer</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">m_Layers</span><span class="p">)</span>
+<span class="w">        </span><span class="k">delete</span><span class="w"> </span><span class="n">layer</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>所有权语义如下：</p>
+<ul>
+<li>Layer 一旦加入 LayerStack，由 LayerStack 负责最终释放；</li>
+<li><code>PopLayer()</code> 或 <code>PopOverlay()</code> 只是从列表移除，不立即删除对象；</li>
+<li>被弹出的 Layer 可以在之后再次加入；</li>
+<li>整个 LayerStack 销毁时，所有仍在列表中的 Layer 都会被删除；</li>
+<li>LayerStack 是 <code>Application</code> 的成员，因此其生命周期跟随应用。</li>
+</ul>
+<p>这意味着当前设计默认 Layer 通常存活到应用结束。未来切换场景或编辑器模式时，可能选择重建整个 LayerStack，而不是频繁弹出并单独销毁 Layer。</p>
+<p>弹出普通层时需要恢复插入位置：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">LayerStack::PopLayer</span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">layer</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">it</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">find</span><span class="p">(</span><span class="n">m_Layers</span><span class="p">.</span><span class="n">begin</span><span class="p">(),</span>
+<span class="w">                       </span><span class="n">m_Layers</span><span class="p">.</span><span class="n">end</span><span class="p">(),</span>
+<span class="w">                       </span><span class="n">layer</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">it</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">m_Layers</span><span class="p">.</span><span class="n">end</span><span class="p">())</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">m_Layers</span><span class="p">.</span><span class="n">erase</span><span class="p">(</span><span class="n">it</span><span class="p">);</span>
+<span class="w">        </span><span class="n">m_LayerInsert</span><span class="o">--</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Overlay 的弹出不会改变普通层分界：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">LayerStack::PopOverlay</span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">overlay</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">it</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">find</span><span class="p">(</span><span class="n">m_Layers</span><span class="p">.</span><span class="n">begin</span><span class="p">(),</span>
+<span class="w">                       </span><span class="n">m_Layers</span><span class="p">.</span><span class="n">end</span><span class="p">(),</span>
+<span class="w">                       </span><span class="n">overlay</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">it</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">m_Layers</span><span class="p">.</span><span class="n">end</span><span class="p">())</span>
+<span class="w">        </span><span class="n">m_Layers</span><span class="p">.</span><span class="n">erase</span><span class="p">(</span><span class="n">it</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_12_04.png" alt="LayerStack 析构负责删除仍由列表拥有的层" loading="lazy">
+  <p class="video-caption">📷 LayerStack 析构负责删除仍由列表拥有的层<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=13&t=724" target="_blank" rel="noopener">回到原视频 (00:12:04)</a></p>
+</div>
+
+<h2 id="6-application-layerstack">6. 在 Application 中接入 LayerStack</h2>
+<p><em>(参考时间: 00:14:46)</em></p>
+<p><code>Application</code> 增加 LayerStack 成员和两个转发函数：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">PushLayer</span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">layer</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">PushOverlay</span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">layer</span><span class="p">);</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="n">LayerStack</span><span class="w"> </span><span class="n">m_LayerStack</span><span class="p">;</span>
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">Application::PushLayer</span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">layer</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">m_LayerStack</span><span class="p">.</span><span class="n">PushLayer</span><span class="p">(</span><span class="n">layer</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">Application::PushOverlay</span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">layer</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">m_LayerStack</span><span class="p">.</span><span class="n">PushOverlay</span><span class="p">(</span><span class="n">layer</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>因为 LayerStack 是 <code>Application</code> 的普通成员，它和应用程序拥有相同生命周期。当前应用只提供 Push，不提供 Pop；先提供一个最小可用版本，后续再扩展。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_15_00.png" alt="Application 增加 PushLayer、PushOverlay 与 LayerStack 成员" loading="lazy">
+  <p class="video-caption">📷 Application 增加 PushLayer、PushOverlay 与 LayerStack 成员<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=13&t=900" target="_blank" rel="noopener">回到原视频 (00:15:00)</a></p>
+</div>
+
+<h2 id="7-update">7. Update 正向遍历</h2>
+<p><em>(参考时间: 00:15:27)</em></p>
+<p>主循环从第一个 Layer 遍历到最后一个：</p>
+<div class="highlight"><pre><span></span><code><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">layer</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">m_LayerStack</span><span class="p">)</span>
+<span class="w">    </span><span class="n">layer</span><span class="o">-&gt;</span><span class="n">OnUpdate</span><span class="p">();</span>
+</code></pre></div>
+
+<p>这里能使用范围循环，是因为 LayerStack 提供了 <code>begin()</code> 和 <code>end()</code>。遍历顺序为：</p>
+<div class="highlight"><pre><span></span><code>普通层 -&gt; 更靠上的普通层 -&gt; Overlay
+</code></pre></div>
+
+<p>Overlay 的 Update 也会执行，并且由于位置在最后，它有机会覆盖或修饰之前层的结果。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_15_30.png" alt="Run 中正向遍历 LayerStack 并调用 OnUpdate" loading="lazy">
+  <p class="video-caption">📷 Run 中正向遍历 LayerStack 并调用 OnUpdate<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=13&t=930" target="_blank" rel="noopener">回到原视频 (00:15:30)</a></p>
+</div>
+
+<h2 id="8-event">8. Event 反向遍历与停止传播</h2>
+<p><em>(参考时间: 00:15:47)</em></p>
+<p><code>Application::OnEvent()</code> 先处理应用级关闭事件，再从 LayerStack 末尾开始向前：</p>
+<div class="highlight"><pre><span></span><code><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="n">it</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">m_LayerStack</span><span class="p">.</span><span class="n">end</span><span class="p">();</span>
+<span class="w">     </span><span class="n">it</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">m_LayerStack</span><span class="p">.</span><span class="n">begin</span><span class="p">();)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="p">(</span><span class="o">*--</span><span class="n">it</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">OnEvent</span><span class="p">(</span><span class="n">e</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">e</span><span class="p">.</span><span class="n">Handled</span><span class="p">)</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>循环没有在每次迭代后自动递减，而是先用 <code>--it</code> 指向前一个有效元素。这样可以安全地从 <code>end()</code> 反向访问。</p>
+<p>事件传播规则：</p>
+<ol>
+<li>Overlay 最先收到事件；</li>
+<li>随后是普通 UI、调试层和游戏层；</li>
+<li>任意 Layer 把事件标记为 <code>Handled</code>；</li>
+<li>循环立即 <code>break</code>，更低层不再收到该事件。</li>
+</ol>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant OS as 窗口 / 输入
+    participant APP as Application
+    participant O as Overlay
+    participant UI as UI Layer
+    participant G as Game Layer
+
+    OS-&gt;&gt;APP: Event
+    APP-&gt;&gt;O: OnEvent
+    O--&gt;&gt;O: EventDispatcher 处理事件
+    alt Overlay 返回 true
+        O--&gt;&gt;APP: Handled = true
+        APP--xG: 停止传播
+    else Overlay 未处理
+        APP-&gt;&gt;UI: OnEvent
+        UI-&gt;&gt;G: 必要时继续传播
+    end
+</code></pre></div>
+
+<p>视频中的典型例子是第一人称射击游戏：如果点击事件被屏幕按钮处理，就不应继续到游戏层并触发开枪。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_15_47.png" alt="OnEvent 从 LayerStack 末尾反向传播并在 Handled 时停止" loading="lazy">
+  <p class="video-caption">📷 OnEvent 从 LayerStack 末尾反向传播并在 Handled 时停止<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=13&t=947" target="_blank" rel="noopener">回到原视频 (00:15:47)</a></p>
+</div>
+
+<h2 id="9">9. 客户端公开头文件</h2>
+<p><em>(参考时间: 00:16:08)</em></p>
+<p><code>Hazel.h</code> 增加 <code>Layer.h</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"Hazel/Application.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"Hazel/Layer.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"Hazel/Log.h"</span>
+</code></pre></div>
+
+<p><code>Application.h</code> 已经间接包含 LayerStack，但 Layer 是客户端最常使用的类型之一，因此在公开头文件中显式包含，使用更直观。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_16_08.png" alt="Hazel.h 向客户端公开 Layer 类型" loading="lazy">
+  <p class="video-caption">📷 Hazel.h 向客户端公开 Layer 类型<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=13&t=968" target="_blank" rel="noopener">回到原视频 (00:16:08)</a></p>
+</div>
+
+<h2 id="10-dll-sandbox">10. 修复 DLL 与 Sandbox 的运行时堆问题</h2>
+<p><em>(参考时间: 00:16:28)</em></p>
+<p>构建 DLL 时，如果 Hazel 和 Sandbox 分别静态链接 C++ 运行时库，二者会拥有不同的堆。跨 DLL 边界释放对方分配的内存时，可能访问错误堆并崩溃。</p>
+<p>视频中，这个问题在 spdlog 释放内存时暴露出来。修复方式是让两个项目都使用多线程 DLL 版本的运行时库：</p>
+<ul>
+<li>Debug 使用 <code>MDd</code>；</li>
+<li>Release 使用 <code>MD</code>。</li>
+</ul>
+<p>Premake 中增加对应配置。这样 Hazel DLL 与 Sandbox 共享兼容的运行时运行时环境，不再跨堆释放内存。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_16_28.png" alt="Premake 改为使用 DLL 版本的 C++ 运行时库" loading="lazy">
+  <p class="video-caption">📷 Premake 改为使用 DLL 版本的 C++ 运行时库<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=13&t=988" target="_blank" rel="noopener">回到原视频 (00:16:28)</a></p>
+</div>
+
+<h2 id="11-examplelayer">11. 创建 ExampleLayer</h2>
+<p><em>(参考时间: 00:18:39)</em></p>
+<p>客户端只需要继承 <code>Hazel::Layer</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ExampleLayer</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">Hazel</span><span class="o">::</span><span class="n">Layer</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">ExampleLayer</span><span class="p">()</span>
+<span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="n">Layer</span><span class="p">(</span><span class="s">"Example"</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">OnUpdate</span><span class="p">()</span><span class="w"> </span><span class="k">override</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">HZ_INFO</span><span class="p">(</span><span class="s">"ExampleLayer::Update"</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">OnEvent</span><span class="p">(</span><span class="n">Hazel</span><span class="o">::</span><span class="n">Event</span><span class="o">&amp;</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="k">override</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">HZ_TRACE</span><span class="p">(</span><span class="s">"{0}"</span><span class="p">,</span><span class="w"> </span><span class="n">event</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p><code>Sandbox</code> 构造函数把 ExampleLayer 推入应用：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Sandbox</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">Hazel</span><span class="o">::</span><span class="n">Application</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">Sandbox</span><span class="p">()</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">PushLayer</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">ExampleLayer</span><span class="p">());</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>如果要让它永远显示在普通层上方，也可以使用 <code>PushOverlay(new ExampleLayer())</code>。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_18_46.png" alt="客户端继承 Layer 并实现 Update 与 Event" loading="lazy">
+  <p class="video-caption">📷 客户端继承 Layer 并实现 Update 与 Event<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=13&t=1126" target="_blank" rel="noopener">回到原视频 (00:18:46)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_19_18.png" alt="Sandbox 通过 PushLayer 把 ExampleLayer 加入应用" loading="lazy">
+  <p class="video-caption">📷 Sandbox 通过 PushLayer 把 ExampleLayer 加入应用<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=13&t=1158" target="_blank" rel="noopener">回到原视频 (00:19:18)</a></p>
+</div>
+
+<h2 id="12">12. 运行结果</h2>
+<p><em>(参考时间: 00:20:01)</em></p>
+<p>运行后可以看到：</p>
+<ul>
+<li>Example Layer 每帧输出 <code>ExampleLayer::Update</code>；</li>
+<li>移动鼠标、按键或操作窗口时，Example Layer 收到事件；</li>
+<li>Hazel 核心日志先记录事件，Example Layer 随后记录事件；</li>
+<li>如果移除 <code>Application::OnEvent</code> 中的核心 Trace，则只保留层自身的事件日志；</li>
+<li>关闭按钮仍由应用级 <code>WindowCloseEvent</code> 处理并结束主循环。</li>
+</ul>
+<p>这展示了 Layer 已经成为游戏逻辑与事件处理的实际接收点，而 <code>Application</code> 负责统一调度和生命周期。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_20_01.png" alt="Example Layer 持续更新并接收窗口事件" loading="lazy">
+  <p class="video-caption">📷 Example Layer 持续更新并接收窗口事件<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=13&t=1201" target="_blank" rel="noopener">回到原视频 (00:20:01)</a></p>
+</div>
+
+<h2 id="13">13. 后续方向</h2>
+<p><em>(参考时间: 00:20:35)</em></p>
+<p>下一步计划是为 Hazel 接入 ImGui，并创建 <code>ImGuiLayer</code>：</p>
+<ul>
+<li>接收 ImGui 需要的事件；</li>
+<li>负责 ImGui 的渲染；</li>
+<li>使用 Overlay 身份保持在普通层上方。</li>
+</ul>
+<p>再往后，3D 世界和 2D UI 也会分别拥有自己的 Layer。届时 LayerStack 将成为 Hazel 运行时的基本组织单位：</p>
+<div class="highlight"><pre><span></span><code>Application
+  -&gt; 管理主循环、窗口和 LayerStack
+Layer
+  -&gt; 更新、渲染和接收事件
+LayerStack
+  -&gt; 确定更新顺序、渲染顺序和事件传播顺序
+</code></pre></div>
+
+<h2 id="14">14. 本节结论</h2>
+<p>本讲建立了 Hazel 的 Layer 系统：</p>
+<ul>
+<li><code>Layer</code> 是客户端可继承的应用模块；</li>
+<li><code>LayerStack</code> 用 <code>vector</code> 管理层和 Overlay；</li>
+<li>普通层始终插在 Overlay 之前；</li>
+<li>Update 从底到顶执行；</li>
+<li>Event 从顶到底传播并在 <code>Handled</code> 后停止；</li>
+<li>LayerStack 拥有 Layer 的最终生命周期；</li>
+<li><code>Application</code> 提供 PushLayer、PushOverlay 并驱动更新与事件；</li>
+<li>客户端可以通过 <code>ExampleLayer</code> 扩展引擎行为。</li>
+</ul>
+<p>Layer 和 LayerStack 看似代码很少，却是后续编辑器、UI、渲染器和工具系统的基础。引擎主循环负责稳定的运行时骨架，具体功能则以 Layer 的形式插入其中。</p>
+<h2 id="_2">附：官方参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=13">Bilibili 精译视频：013 - 图层</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel">The Cherno 的 Hazel 仓库</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/tree/5bd809312a266c23d13d84dcd08a833a526aa264">本期对应代码提交 <code>5bd8093</code></a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>

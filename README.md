@@ -16,3 +16,7 @@
   - [Markdown 版本](<Hazel Game Engine/012 - Window Events/book.md>)
   - 视频来源：[Bilibili 精译版第 12 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=12)
   - 主题：GLFW 原生回调、`WindowData` 用户指针、窗口与输入事件、`EventDispatcher` 和关闭主循环
+- [013 - 图层](<Hazel Game Engine/013 - Layers/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/013 - Layers/book.md>)
+  - 视频来源：[Bilibili 精译版第 13 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=13)
+  - 主题：`Layer`、`LayerStack`、Overlay、正向更新、反向事件传播和客户端示例层
