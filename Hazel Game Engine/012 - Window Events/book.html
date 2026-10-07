@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 012：窗口事件</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: var(--text-secondary); font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-012">Hazel 游戏引擎笔记 012：窗口事件</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12">The Cherno 游戏引擎系列第 12 讲“窗口事件”</a>，时长约 23 分 37 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。代码参考提交：<a href="https://github.com/TheCherno/Hazel/tree/30516ad7109b016213eb732f14e1c7061c1db603"><code>30516ad</code></a>。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材；术语和代码以原视频及同期 Hazel 仓库为准。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>上一讲创建了抽象窗口和 <code>WindowsWindow</code>，但窗口事件只会被 <code>glfwPollEvents()</code> 从系统队列取走，无法进入 Hazel。本讲把“事件系统”和“窗口系统”连接起来：</p>
+<ul>
+<li><code>Application</code> 向窗口注册 <code>OnEvent</code> 回调；</li>
+<li><code>WindowsWindow</code> 注册 GLFW 的窗口大小、关闭、键盘、鼠标按钮、滚轮和鼠标移动回调；</li>
+<li>每个原生回调都转换成对应的 Hazel <code>Event</code>；</li>
+<li><code>Application</code> 使用 <code>EventDispatcher</code> 判断事件类型；</li>
+<li>收到 <code>WindowCloseEvent</code> 后把 <code>m_Running</code> 设为 <code>false</code>，真正关闭应用。</li>
+</ul>
+<p>完成本节后，点击窗口关闭按钮不再“无响应”，而是通过 Hazel 自己的事件系统结束主循环。</p>
+<h2 id="1">1. 事件系统与窗口系统如何连接</h2>
+<p><em>(参考时间: 00:00:28)</em></p>
+<p>窗口会不断产生事件：</p>
+<ul>
+<li>鼠标移动；</li>
+<li>键盘按下、释放和重复；</li>
+<li>鼠标按钮按下与释放；</li>
+<li>鼠标滚轮；</li>
+<li>窗口缩放；</li>
+<li>窗口关闭。</li>
+</ul>
+<p>事件系统知道怎样描述和分发事件，窗口知道什么时候发生事件，但两者此前没有连接。本节需要完成一次转换：</p>
+<div class="highlight"><pre><span></span><code>操作系统 / GLFW 原生事件
+  -&gt; WindowsWindow 原生回调
+  -&gt; 构造 Hazel Event
+  -&gt; 调用 WindowData.EventCallback
+  -&gt; Application::OnEvent
+  -&gt; EventDispatcher
+  -&gt; 具体处理函数
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>graph TD
+    A[操作系统和 GLFW] --&gt;|原生回调| B[WindowsWindow]
+    B --&gt; C[取出 WindowData 用户指针]
+    C --&gt; D[构造对应 Hazel Event]
+    D --&gt; E[WindowData.EventCallback]
+    E --&gt; F[Application::OnEvent]
+    F --&gt; G[EventDispatcher]
+    G --&gt; H[具体事件处理函数]
+</code></pre></div>
+
+<p>最急迫的实际问题是关闭按钮。当前点击关闭按钮没有任何效果，因为关闭事件没有被转换成 <code>WindowCloseEvent</code>，主循环中的 <code>m_Running</code> 也没有被修改。</p>
+<h2 id="2-application">2. Application 注册事件回调</h2>
+<p><em>(参考时间: 00:02:12)</em></p>
+<p><code>Window</code> 接口上一讲已经预留：</p>
+<div class="highlight"><pre><span></span><code><span class="k">using</span><span class="w"> </span><span class="n">EventCallbackFn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">function</span><span class="o">&lt;</span><span class="kt">void</span><span class="p">(</span><span class="n">Event</span><span class="o">&amp;</span><span class="p">)</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">SetEventCallback</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">EventCallbackFn</span><span class="o">&amp;</span><span class="w"> </span><span class="n">callback</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+</code></pre></div>
+
+<p><code>Application</code> 构造函数现在把这个回调注册到窗口：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Application</span><span class="o">::</span><span class="n">Application</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">m_Window</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">Window</span><span class="o">&gt;</span><span class="p">(</span><span class="n">Window</span><span class="o">::</span><span class="n">Create</span><span class="p">());</span>
+<span class="w">    </span><span class="n">m_Window</span><span class="o">-&gt;</span><span class="n">SetEventCallback</span><span class="p">(</span><span class="n">BIND_EVENT_FN</span><span class="p">(</span><span class="n">OnEvent</span><span class="p">));</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>窗口不需要知道 <code>Application</code> 类型，只保存一个接受 <code>Event&amp;</code> 的通用回调。这样窗口层继续保持独立，应用层也不需要直接接触 GLFW。</p>
+<p><code>Application</code> 头文件增加事件入口和关闭处理声明：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">OnEvent</span><span class="p">(</span><span class="n">Event</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">);</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">OnWindowClose</span><span class="p">(</span><span class="n">WindowCloseEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">);</span>
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_02_12.png" alt="Application 中注册 OnEvent 事件回调" loading="lazy">
+  <p class="video-caption">📷 Application 中注册 OnEvent 事件回调<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12&t=132" target="_blank" rel="noopener">回到原视频 (00:02:12)</a></p>
+</div>
+
+<h2 id="3">3. 用宏简化成员函数绑定</h2>
+<p><em>(参考时间: 00:03:37)</em></p>
+<p><code>SetEventCallback</code> 需要的是一个普通函数对象，而 <code>OnEvent</code> 是 <code>Application</code> 的成员函数。代码使用 <code>std::bind</code> 绑定当前实例：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#define BIND_EVENT_FN(x) \</span>
+<span class="cp">    std::bind(&amp;Application::x, this, std::placeholders::_1)</span>
+</code></pre></div>
+
+<p>之后可以写成：</p>
+<div class="highlight"><pre><span></span><code><span class="n">BIND_EVENT_FN</span><span class="p">(</span><span class="n">OnEvent</span><span class="p">)</span>
+</code></pre></div>
+
+<p>它等价于：</p>
+<div class="highlight"><pre><span></span><code><span class="n">std</span><span class="o">::</span><span class="n">bind</span><span class="p">(</span><span class="o">&amp;</span><span class="n">Application</span><span class="o">::</span><span class="n">OnEvent</span><span class="p">,</span>
+<span class="w">          </span><span class="k">this</span><span class="p">,</span>
+<span class="w">          </span><span class="n">std</span><span class="o">::</span><span class="n">placeholders</span><span class="o">::</span><span class="n">_1</span><span class="p">)</span>
+</code></pre></div>
+
+<p>没有宏时，每个事件处理函数都要重复写类名、<code>this</code> 和占位符。宏把这套固定形式集中起来，让分发代码更短。</p>
+<p>还可以把宏进一步泛化，使其不写死 <code>Application</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#define BIND_EVENT_FN(x) \</span>
+<span class="cp">    std::bind(&amp;x, this, std::placeholders::_1)</span>
+
+<span class="c1">// 使用时：</span>
+<span class="n">BIND_EVENT_FN</span><span class="p">(</span><span class="n">Application</span><span class="o">::</span><span class="n">OnEvent</span><span class="p">)</span>
+</code></pre></div>
+
+<p>视频保留了当前更简单的版本，因为它只服务于 <code>Application</code> 的事件处理。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_03_37.png" alt="BIND_EVENT_FN 宏封装 std::bind 和占位符" loading="lazy">
+  <p class="video-caption">📷 BIND_EVENT_FN 宏封装 std::bind 和占位符<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12&t=217" target="_blank" rel="noopener">回到原视频 (00:03:37)</a></p>
+</div>
+
+<h2 id="4-onevent">4. OnEvent 与事件日志</h2>
+<p><em>(参考时间: 00:04:33)</em></p>
+<p><code>Application::OnEvent</code> 成为窗口事件的统一入口：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">Application::OnEvent</span><span class="p">(</span><span class="n">Event</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">EventDispatcher</span><span class="w"> </span><span class="n">dispatcher</span><span class="p">(</span><span class="n">e</span><span class="p">);</span>
+<span class="w">    </span><span class="n">dispatcher</span><span class="p">.</span><span class="n">Dispatch</span><span class="o">&lt;</span><span class="n">WindowCloseEvent</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">        </span><span class="n">BIND_EVENT_FN</span><span class="p">(</span><span class="n">OnWindowClose</span><span class="p">));</span>
+
+<span class="w">    </span><span class="n">HZ_CORE_TRACE</span><span class="p">(</span><span class="s">"{0}"</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>窗口回调会把事件保存到 <code>WindowData.EventCallback</code>。因此 <code>data.EventCallback(event)</code> 最终会进入 <code>Application::OnEvent</code>。</p>
+<p>日志使用 <code>HZ_CORE_TRACE</code> 而不是 <code>HZ_CORE_INFO</code>，避免调试事件持续以高亮颜色刷满控制台。由于每种事件都实现了 <code>ToString()</code>，日志可以直接看到事件类型和携带的数据。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_04_33.png" alt="Application::OnEvent 和事件调试日志" loading="lazy">
+  <p class="video-caption">📷 Application::OnEvent 和事件调试日志<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12&t=273" target="_blank" rel="noopener">回到原视频 (00:04:33)</a></p>
+</div>
+
+<h2 id="5-glfw-windowdata">5. 从 GLFW 回调找回 WindowData</h2>
+<p><em>(参考时间: 00:06:20)</em></p>
+<p>GLFW 原生回调只能收到 <code>GLFWwindow*</code>，不能直接拿到 <code>WindowsWindow</code> 对象。上一讲通过 <code>glfwSetWindowUserPointer()</code> 保存了 <code>WindowData</code> 地址：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glfwSetWindowUserPointer</span><span class="p">(</span><span class="n">m_Window</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">m_Data</span><span class="p">);</span>
+</code></pre></div>
+
+<p>在任意 GLFW 回调中，可以取回这个 <code>void*</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="n">WindowData</span><span class="o">&amp;</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="o">*</span><span class="p">(</span><span class="n">WindowData</span><span class="o">*</span><span class="p">)</span><span class="n">glfwGetWindowUserPointer</span><span class="p">(</span><span class="n">window</span><span class="p">);</span>
+</code></pre></div>
+
+<p>这是一种 C 风格强制转换。它要求注册用户指针时和回调读取时使用完全相同的类型。所有 GLFW 回调随后都复用这条路径，再调用：</p>
+<div class="highlight"><pre><span></span><code><span class="n">data</span><span class="p">.</span><span class="n">EventCallback</span><span class="p">(</span><span class="n">event</span><span class="p">);</span>
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>graph TD
+    A[GLFWwindow] --&gt;|glfwSetWindowUserPointer| B[WindowData*]
+    B --&gt; C[Title]
+    B --&gt; D[Width / Height]
+    B --&gt; E[VSync]
+    B --&gt; F[EventCallback]
+    G[GLFW 原生回调] --&gt;|glfwGetWindowUserPointer| B
+    F --&gt; H[Application::OnEvent]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_06_20.png" alt="通过 GLFW 用户指针取回 WindowData" loading="lazy">
+  <p class="video-caption">📷 通过 GLFW 用户指针取回 WindowData<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12&t=380" target="_blank" rel="noopener">回到原视频 (00:06:20)</a></p>
+</div>
+
+<h2 id="6-glfw">6. GLFW 事件回调逐项实现</h2>
+<p><em>(参考时间: 00:05:16)</em></p>
+<p>所有原生回调都在 <code>WindowsWindow::Init()</code> 中注册。</p>
+<h3 id="61">6.1 窗口大小变化</h3>
+<div class="highlight"><pre><span></span><code><span class="n">glfwSetWindowSizeCallback</span><span class="p">(</span><span class="n">m_Window</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[](</span><span class="n">GLFWwindow</span><span class="o">*</span><span class="w"> </span><span class="n">window</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">width</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">height</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">WindowData</span><span class="o">&amp;</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span>
+<span class="w">            </span><span class="o">*</span><span class="p">(</span><span class="n">WindowData</span><span class="o">*</span><span class="p">)</span><span class="n">glfwGetWindowUserPointer</span><span class="p">(</span><span class="n">window</span><span class="p">);</span>
+
+<span class="w">        </span><span class="n">data</span><span class="p">.</span><span class="n">Width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">width</span><span class="p">;</span>
+<span class="w">        </span><span class="n">data</span><span class="p">.</span><span class="n">Height</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">height</span><span class="p">;</span>
+
+<span class="w">        </span><span class="n">WindowResizeEvent</span><span class="w"> </span><span class="nf">event</span><span class="p">(</span><span class="n">width</span><span class="p">,</span><span class="w"> </span><span class="n">height</span><span class="p">);</span>
+<span class="w">        </span><span class="n">data</span><span class="p">.</span><span class="n">EventCallback</span><span class="p">(</span><span class="n">event</span><span class="p">);</span>
+<span class="w">    </span><span class="p">});</span>
+</code></pre></div>
+
+<p>这里先更新 <code>WindowData</code>，再创建和分发事件。原因是事件处理函数可能会查询窗口当前宽高；如果等到回调结束后才更新缓存，处理函数读到的仍是旧尺寸。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_07_44.png" alt="窗口大小回调先更新宽高再派发 WindowResizeEvent" loading="lazy">
+  <p class="video-caption">📷 窗口大小回调先更新宽高再派发 WindowResizeEvent<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12&t=464" target="_blank" rel="noopener">回到原视频 (00:07:44)</a></p>
+</div>
+
+<h3 id="62">6.2 窗口关闭</h3>
+<p>关闭回调没有额外参数，只需要构造 <code>WindowCloseEvent</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glfwSetWindowCloseCallback</span><span class="p">(</span><span class="n">m_Window</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[](</span><span class="n">GLFWwindow</span><span class="o">*</span><span class="w"> </span><span class="n">window</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">WindowData</span><span class="o">&amp;</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span>
+<span class="w">            </span><span class="o">*</span><span class="p">(</span><span class="n">WindowData</span><span class="o">*</span><span class="p">)</span><span class="n">glfwGetWindowUserPointer</span><span class="p">(</span><span class="n">window</span><span class="p">);</span>
+
+<span class="w">        </span><span class="n">WindowCloseEvent</span><span class="w"> </span><span class="n">event</span><span class="p">;</span>
+<span class="w">        </span><span class="n">data</span><span class="p">.</span><span class="n">EventCallback</span><span class="p">(</span><span class="n">event</span><span class="p">);</span>
+<span class="w">    </span><span class="p">});</span>
+</code></pre></div>
+
+<h3 id="63">6.3 键盘回调</h3>
+<p>GLFW 键盘回调包含：</p>
+<ul>
+<li><code>key</code>：GLFW 键码；</li>
+<li><code>scancode</code>：平台扫描码；</li>
+<li><code>action</code>：<code>GLFW_PRESS</code>、<code>GLFW_RELEASE</code> 或 <code>GLFW_REPEAT</code>；</li>
+<li><code>mods</code>：Shift、Ctrl、Alt 等修饰键状态。</li>
+</ul>
+<p>代码对 <code>action</code> 进行分支：</p>
+<div class="highlight"><pre><span></span><code><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">action</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">GLFW_PRESS</span><span class="p">:</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">KeyPressedEvent</span><span class="w"> </span><span class="nf">event</span><span class="p">(</span><span class="n">key</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="w">        </span><span class="n">data</span><span class="p">.</span><span class="n">EventCallback</span><span class="p">(</span><span class="n">event</span><span class="p">);</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">GLFW_RELEASE</span><span class="p">:</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">KeyReleasedEvent</span><span class="w"> </span><span class="nf">event</span><span class="p">(</span><span class="n">key</span><span class="p">);</span>
+<span class="w">        </span><span class="n">data</span><span class="p">.</span><span class="n">EventCallback</span><span class="p">(</span><span class="n">event</span><span class="p">);</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">GLFW_REPEAT</span><span class="p">:</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">KeyPressedEvent</span><span class="w"> </span><span class="nf">event</span><span class="p">(</span><span class="n">key</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="w">        </span><span class="n">data</span><span class="p">.</span><span class="n">EventCallback</span><span class="p">(</span><span class="n">event</span><span class="p">);</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>首次按下使用 <code>repeatCount = 0</code>，系统重复事件暂时统一使用 <code>repeatCount = 1</code>。GLFW 没有通过这个回调提供具体重复次数，而 Win32 API 可以；如果未来需要精确计数，需要从平台层补充。</p>
+<p>视频也指出一个重要边界：当前直接把 GLFW 键码塞进 <code>KeyPressedEvent</code>，而 Hazel 最终需要自己的键码枚举。否则其他平台或非 GLFW 后端会暴露后端特定值。目前先把事件通路跑通，键码转换留到后续输入系统。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_09_30.png" alt="键盘回调中的 PRESS、RELEASE 和 REPEAT 分支" loading="lazy">
+  <p class="video-caption">📷 键盘回调中的 PRESS、RELEASE 和 REPEAT 分支<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12&t=570" target="_blank" rel="noopener">回到原视频 (00:09:30)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_10_11.png" alt="GLFW 键码需要在未来转换为 Hazel 自己的键码" loading="lazy">
+  <p class="video-caption">📷 GLFW 键码需要在未来转换为 Hazel 自己的键码<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12&t=611" target="_blank" rel="noopener">回到原视频 (00:10:11)</a></p>
+</div>
+
+<h3 id="64">6.4 鼠标按钮</h3>
+<p>鼠标按钮回调与键盘类似，但只有按下和释放：</p>
+<div class="highlight"><pre><span></span><code><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">action</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">GLFW_PRESS</span><span class="p">:</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">MouseButtonPressedEvent</span><span class="w"> </span><span class="nf">event</span><span class="p">(</span><span class="n">button</span><span class="p">);</span>
+<span class="w">        </span><span class="n">data</span><span class="p">.</span><span class="n">EventCallback</span><span class="p">(</span><span class="n">event</span><span class="p">);</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">GLFW_RELEASE</span><span class="p">:</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">MouseButtonReleasedEvent</span><span class="w"> </span><span class="nf">event</span><span class="p">(</span><span class="n">button</span><span class="p">);</span>
+<span class="w">        </span><span class="n">data</span><span class="p">.</span><span class="n">EventCallback</span><span class="p">(</span><span class="n">event</span><span class="p">);</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>当前没有鼠标按钮重复事件。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_12_47.png" alt="鼠标按钮回调转换为按下和释放事件" loading="lazy">
+  <p class="video-caption">📷 鼠标按钮回调转换为按下和释放事件<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12&t=767" target="_blank" rel="noopener">回到原视频 (00:12:47)</a></p>
+</div>
+
+<h3 id="65">6.5 鼠标滚轮</h3>
+<p>GLFW 滚轮回调提供两个 <code>double</code> 偏移：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glfwSetScrollCallback</span><span class="p">(</span><span class="n">m_Window</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[](</span><span class="n">GLFWwindow</span><span class="o">*</span><span class="w"> </span><span class="n">window</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">xOffset</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">yOffset</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">WindowData</span><span class="o">&amp;</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span>
+<span class="w">            </span><span class="o">*</span><span class="p">(</span><span class="n">WindowData</span><span class="o">*</span><span class="p">)</span><span class="n">glfwGetWindowUserPointer</span><span class="p">(</span><span class="n">window</span><span class="p">);</span>
+
+<span class="w">        </span><span class="n">MouseScrolledEvent</span><span class="w"> </span><span class="nf">event</span><span class="p">(</span>
+<span class="w">            </span><span class="p">(</span><span class="kt">float</span><span class="p">)</span><span class="n">xOffset</span><span class="p">,</span>
+<span class="w">            </span><span class="p">(</span><span class="kt">float</span><span class="p">)</span><span class="n">yOffset</span><span class="p">);</span>
+<span class="w">        </span><span class="n">data</span><span class="p">.</span><span class="n">EventCallback</span><span class="p">(</span><span class="n">event</span><span class="p">);</span>
+<span class="w">    </span><span class="p">});</span>
+</code></pre></div>
+
+<p>Hazel 的 <code>MouseScrolledEvent</code> 使用 <code>float</code>，因此这里显式转换。水平和垂直偏移都保留，以支持鼠标或触控板的横向滚动。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_13_44.png" alt="滚轮回调把双精度偏移转换为 MouseScrolledEvent" loading="lazy">
+  <p class="video-caption">📷 滚轮回调把双精度偏移转换为 MouseScrolledEvent<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12&t=824" target="_blank" rel="noopener">回到原视频 (00:13:44)</a></p>
+</div>
+
+<h3 id="66">6.6 鼠标移动</h3>
+<p>鼠标移动回调同样提供两个 <code>double</code>，转换后构造 <code>MouseMovedEvent</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glfwSetCursorPosCallback</span><span class="p">(</span><span class="n">m_Window</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[](</span><span class="n">GLFWwindow</span><span class="o">*</span><span class="w"> </span><span class="n">window</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">xPos</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">yPos</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">WindowData</span><span class="o">&amp;</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span>
+<span class="w">            </span><span class="o">*</span><span class="p">(</span><span class="n">WindowData</span><span class="o">*</span><span class="p">)</span><span class="n">glfwGetWindowUserPointer</span><span class="p">(</span><span class="n">window</span><span class="p">);</span>
+
+<span class="w">        </span><span class="n">MouseMovedEvent</span><span class="w"> </span><span class="nf">event</span><span class="p">(</span>
+<span class="w">            </span><span class="p">(</span><span class="kt">float</span><span class="p">)</span><span class="n">xPos</span><span class="p">,</span>
+<span class="w">            </span><span class="p">(</span><span class="kt">float</span><span class="p">)</span><span class="n">yPos</span><span class="p">);</span>
+<span class="w">        </span><span class="n">data</span><span class="p">.</span><span class="n">EventCallback</span><span class="p">(</span><span class="n">event</span><span class="p">);</span>
+<span class="w">    </span><span class="p">});</span>
+</code></pre></div>
+
+<p>鼠标坐标以窗口客户区为参考，不是全局屏幕坐标。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_14_49.png" alt="鼠标移动回调构造 MouseMovedEvent" loading="lazy">
+  <p class="video-caption">📷 鼠标移动回调构造 MouseMovedEvent<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12&t=889" target="_blank" rel="noopener">回到原视频 (00:14:49)</a></p>
+</div>
+
+<h2 id="7-glfw">7. GLFW 错误回调</h2>
+<p><em>(参考时间: 00:15:59)</em></p>
+<p>GLFW 还可以注册全局错误回调。本讲在第一次初始化 GLFW 后设置：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glfwSetErrorCallback</span><span class="p">(</span><span class="n">GLFWErrorCallback</span><span class="p">);</span>
+</code></pre></div>
+
+<p>错误回调是一个静态函数：</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">GLFWErrorCallback</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">error</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">description</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">HZ_CORE_ERROR</span><span class="p">(</span><span class="s">"GLFW Error ({0}): {1}"</span><span class="p">,</span>
+<span class="w">                  </span><span class="n">error</span><span class="p">,</span>
+<span class="w">                  </span><span class="n">description</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>它不是窗口事件，而是 GLFW 内部的错误报告机制。把它接入 Hazel 日志后，初始化或运行期间的问题会与其他核心日志出现在同一控制台。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_15_59.png" alt="注册 GLFW 错误回调并记录错误码与描述" loading="lazy">
+  <p class="video-caption">📷 注册 GLFW 错误回调并记录错误码与描述<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12&t=959" target="_blank" rel="noopener">回到原视频 (00:15:59)</a></p>
+</div>
+
+<h2 id="8">8. 第一次运行：所有事件进入日志</h2>
+<p><em>(参考时间: 00:17:20)</em></p>
+<p>运行应用后，<code>Application::OnEvent</code> 会记录：</p>
+<ul>
+<li>鼠标移动时的坐标；</li>
+<li>鼠标按钮按下与释放；</li>
+<li>键盘按下和释放；</li>
+<li>按住按键时 <code>KeyPressedEvent</code> 的重复计数为 <code>1</code>；</li>
+<li>滚轮偏移；</li>
+<li>窗口缩放后的宽高；</li>
+<li>关闭窗口时的 <code>WindowCloseEvent</code>。</li>
+</ul>
+<p>这说明 GLFW 原生回调和 Hazel 事件系统已经完整连通，而不是只注册了回调却没有派发。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_17_20.png" alt="首次运行后日志持续记录鼠标、键盘、滚轮和缩放事件" loading="lazy">
+  <p class="video-caption">📷 首次运行后日志持续记录鼠标、键盘、滚轮和缩放事件<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12&t=1040" target="_blank" rel="noopener">回到原视频 (00:17:20)</a></p>
+</div>
+
+<h2 id="9-eventdispatcher">9. 用 EventDispatcher 处理关闭事件</h2>
+<p><em>(参考时间: 00:18:24)</em></p>
+<p>事件已经能到达 <code>Application</code>，接下来使用上一讲实现的 <code>EventDispatcher</code> 筛选具体类型。</p>
+<h3 id="91">9.1 创建关闭处理函数</h3>
+<div class="highlight"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">Application::OnWindowClose</span><span class="p">(</span><span class="n">WindowCloseEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">m_Running</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>返回 <code>true</code> 表示事件已经被处理。主循环下一次检查 <code>m_Running</code> 时会退出。</p>
+<h3 id="92">9.2 注册分发分支</h3>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">Application::OnEvent</span><span class="p">(</span><span class="n">Event</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">EventDispatcher</span><span class="w"> </span><span class="n">dispatcher</span><span class="p">(</span><span class="n">e</span><span class="p">);</span>
+<span class="w">    </span><span class="n">dispatcher</span><span class="p">.</span><span class="n">Dispatch</span><span class="o">&lt;</span><span class="n">WindowCloseEvent</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">        </span><span class="n">BIND_EVENT_FN</span><span class="p">(</span><span class="n">OnWindowClose</span><span class="p">));</span>
+
+<span class="w">    </span><span class="n">HZ_CORE_TRACE</span><span class="p">(</span><span class="s">"{0}"</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><code>Dispatch&lt;WindowCloseEvent&gt;</code> 内部会：</p>
+<ol>
+<li>比较传入事件的运行时类型；</li>
+<li>取得模板类型 <code>WindowCloseEvent::GetStaticType()</code>；</li>
+<li>类型匹配时调用绑定函数；</li>
+<li>用函数返回值设置事件的 <code>m_Handled</code>。</li>
+</ol>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[GLFW 关闭回调] --&gt; B[构造 WindowCloseEvent]
+    B --&gt; C[Application::OnEvent]
+    C --&gt; D[EventDispatcher]
+    D --&gt; E{是否 WindowCloseEvent?}
+    E -- 是 --&gt; F[OnWindowClose]
+    F --&gt; G[m_Running = false]
+    G --&gt; H[主循环退出]
+    E -- 否 --&gt; I[继续尝试其他分发分支]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_18_24.png" alt="Application 中注册 WindowCloseEvent 分发分支" loading="lazy">
+  <p class="video-caption">📷 Application 中注册 WindowCloseEvent 分发分支<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12&t=1104" target="_blank" rel="noopener">回到原视频 (00:18:24)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_19_17.png" alt="OnWindowClose 把 m_Running 设置为 false" loading="lazy">
+  <p class="video-caption">📷 OnWindowClose 把 m_Running 设置为 false<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12&t=1157" target="_blank" rel="noopener">回到原视频 (00:19:17)</a></p>
+</div>
+
+<p>构建时出现过“不认识 <code>WindowCloseEvent</code>”的错误，原因是 <code>Application.h</code> 的声明需要具体类型定义。把 <code>ApplicationEvent.h</code> 放到头文件包含路径后即可正常编译。</p>
+<h2 id="10">10. 关闭按钮验证</h2>
+<p><em>(参考时间: 00:21:03)</em></p>
+<p>再次运行程序后：</p>
+<ul>
+<li>鼠标移动事件持续输出；</li>
+<li>键盘和鼠标按钮事件正常；</li>
+<li>滚轮和窗口缩放正常；</li>
+<li>点击关闭按钮后，<code>WindowCloseEvent</code> 被分发到 <code>OnWindowClose</code>；</li>
+<li><code>m_Running</code> 变为 <code>false</code>，主循环退出，应用关闭。</li>
+</ul>
+<p>这证明完整链路已经成立：</p>
+<div class="highlight"><pre><span></span><code>GLFW 原生关闭回调
+  -&gt; WindowCloseEvent
+  -&gt; EventCallback
+  -&gt; Application::OnEvent
+  -&gt; EventDispatcher::Dispatch&lt;WindowCloseEvent&gt;
+  -&gt; Application::OnWindowClose
+  -&gt; m_Running = false
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_21_10.png" alt="点击关闭按钮后应用通过 WindowCloseEvent 正常退出" loading="lazy">
+  <p class="video-caption">📷 点击关闭按钮后应用通过 WindowCloseEvent 正常退出<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12&t=1270" target="_blank" rel="noopener">回到原视频 (00:21:10)</a></p>
+</div>
+
+<h2 id="11">11. 当前设计边界</h2>
+<p>本节让窗口事件完整进入 Hazel，但仍有几项等待后续处理。</p>
+<p>第一，键盘事件直接携带 GLFW 键码。成熟的跨平台引擎需要把 GLFW 键码转换成 Hazel 自己的键码枚举。</p>
+<p>第二，当前系统是事件通知机制。应用无法直接询问“某个按键当前是否按下”，这需要额外的输入状态轮询接口，而不能仅靠事件回调完成。</p>
+<p>第三，所有事件目前先到达 <code>Application::OnEvent</code>。未来引入 Layer Stack 后，应用会把事件继续传播给各层，并通过 <code>m_Handled</code> 决定是否停止传播。</p>
+<p>第四，<code>WindowsWindow</code> 使用原始指针样式把 <code>GLFWwindow*</code> 和 <code>WindowData*</code> 进行转换。当前类型控制在一个文件内没有问题，但后续可以使用更安全的包装或辅助函数减少 C 风格转换。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Window 原生事件] --&gt; B[Application::OnEvent]
+    B --&gt; C[EventDispatcher]
+    C --&gt; D[WindowCloseEvent 等]
+    C -. 未来 .-&gt; E[LayerStack]
+    E --&gt; F[Layer A]
+    F --&gt; G{Handled?}
+    G -- 否 --&gt; H[Layer B]
+    G -- 是 --&gt; I[停止传播]
+</code></pre></div>
+
+<h2 id="12">12. 本节结论</h2>
+<p>这一讲把前面三个独立部分真正组合了起来：</p>
+<ul>
+<li>抽象 <code>Window</code> 提供事件回调接口；</li>
+<li><code>WindowsWindow</code> 注册 GLFW 原生回调并构造 Hazel 事件；</li>
+<li><code>Application</code> 使用 <code>EventDispatcher</code> 处理关闭事件；</li>
+<li><code>m_Running</code> 控制主循环生命周期。</li>
+</ul>
+<p>至此，Hazel 已经拥有一套可以工作的端到端窗口事件系统。窗口大小、关闭、键盘、鼠标按钮、滚轮和鼠标移动都能形成类型明确的事件，并交给应用处理。下一阶段可以把事件继续传给 Layer Stack，并补上输入轮询，使引擎能够回答按键和鼠标的持续状态。</p>
+<h2 id="_2">附：官方参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=12">Bilibili 精译视频：012 - 窗口事件</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel">The Cherno 的 Hazel 仓库</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/tree/30516ad7109b016213eb732f14e1c7061c1db603">本期对应代码提交 <code>30516ad</code></a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>

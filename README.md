@@ -12,3 +12,7 @@
   - [Markdown 版本](<Hazel Game Engine/011 - Window Abstraction and GLFW/book.md>)
   - 视频来源：[Bilibili 精译版第 11 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=11)
   - 主题：平台抽象、GLFW 子模块与 Premake、`Window` 接口、`WindowsWindow`、OpenGL 上下文和 VSync
+- [012 - 窗口事件](<Hazel Game Engine/012 - Window Events/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/012 - Window Events/book.md>)
+  - 视频来源：[Bilibili 精译版第 12 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=12)
+  - 主题：GLFW 原生回调、`WindowData` 用户指针、窗口与输入事件、`EventDispatcher` 和关闭主循环
