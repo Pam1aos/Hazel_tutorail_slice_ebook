@@ -1,0 +1,1520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>虚拟机和容器：从全系统模拟到云原生编排</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: #f3f4f6; font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+            code { overflow-wrap: anywhere; word-break: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="_1">虚拟机和容器：从全系统模拟到云原生编排</h1>
+<blockquote>
+<p><strong>课程</strong>：2026 春季学期《操作系统原理》<br />
+<strong>讲师</strong>：蒋炎岩（jyy）<br />
+<strong>官方课程主页</strong>：<a href="https://jyywiki.cn/OS/2026/">https://jyywiki.cn/OS/2026/</a><br />
+<strong>官方讲义</strong>：<a href="https://jyywiki.cn/OS/2026/lect29.md">https://jyywiki.cn/OS/2026/lect29.md</a><br />
+<strong>视频来源</strong>：<a href="https://www.bilibili.com/video/BV1uaEB66EAH/">Bilibili BV1uaEB66EAH</a><br />
+<strong>版权说明</strong>：课程讲义与幻灯片归蒋炎岩所有，采用 <a href="http://creativecommons.org/licenses/by-nc/4.0/">Creative Commons BY-NC 4.0</a> 许可；本电子书是对课堂讲授的书面化重构，保留出处与许可说明。</p>
+</blockquote>
+<h2 id="_2">导语：一台机器如何变成许多台</h2>
+<p><em>(参考时间: 00:00)</em></p>
+<p>虚拟化的目标可以概括为一句话：</p>
+<blockquote>
+<p>让一个进程或操作系统以为自己独占了一台机器。</p>
+</blockquote>
+<p>课程从最朴素的全系统模拟出发，逐步走到现代容器：</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A["Full System Emulation"] --&gt; B["JIT / 动态翻译"]
+    B --&gt; C["VMM 直接执行"]
+    C --&gt; D["硬件虚拟化"]
+    D --&gt; E["操作系统级虚拟化"]
+    E --&gt; F["Namespaces"]
+    E --&gt; G["cgroups"]
+    F --&gt; H["容器"]
+    G --&gt; H
+    H --&gt; I["Kubernetes 编排"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_01_00.png" alt="从全系统模拟一路走到容器与 Kubernetes" loading="lazy">
+  <p class="video-caption">📷 从全系统模拟一路走到容器与 Kubernetes<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=60" target="_blank" rel="noopener">回到原视频 (00:01:00)</a></p>
+</div>
+
+<hr />
+<h2 id="1">1. 全系统模拟：概念简单，性能困难</h2>
+<h3 id="11-nemu">1.1 NEMU 式模拟器</h3>
+<p><em>(参考时间: 00:00)</em></p>
+<p>全系统模拟器需要：</p>
+<ol>
+<li>取指令；</li>
+<li>译码；</li>
+<li>执行；</li>
+<li>更新 CPU 状态；</li>
+<li>处理特权指令和设备。</li>
+</ol>
+<p>概念模型并不复杂，但逐条解释指令的性能通常不到原生执行的 <code>1/10</code>。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["Fetch"] --&gt; B["Decode"]
+    B --&gt; C["Execute"]
+    C --&gt; D["Update CPU State"]
+    D --&gt; E{"Next?"}
+    E -- "继续" --&gt; A
+    E -- "异常 / 中断" --&gt; F["Handle Trap"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_01_00.png" alt="逐条解释执行可以获得正确性但性能很低" loading="lazy">
+  <p class="video-caption">📷 逐条解释执行可以获得正确性但性能很低<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=60" target="_blank" rel="noopener">回到原视频 (00:01:00)</a></p>
+</div>
+
+<h3 id="12-basic-block">1.2 Basic Block</h3>
+<p><em>(参考时间: 00:02)</em></p>
+<p>如果连续取出的指令不改变控制流，它们可以组成一个 <strong>basic block</strong>：</p>
+<div class="highlight"><pre><span></span><code><span class="nf">mov</span><span class="w"> </span><span class="no">eax</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span>
+<span class="nf">mov</span><span class="w"> </span><span class="no">ebx</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span>
+<span class="nf">add</span><span class="w"> </span><span class="no">eax</span><span class="p">,</span><span class="w"> </span><span class="no">ebx</span>
+</code></pre></div>
+
+<p>直到遇到：</p>
+<ul>
+<li>条件跳转；</li>
+<li>间接跳转；</li>
+<li><code>return</code>；</li>
+<li>异常或系统调用。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A["Instruction 1"] --&gt; B["Instruction 2"]
+    B --&gt; C["Instruction 3"]
+    C --&gt; D["Branch / Return"]
+    D --&gt; E["Basic Block Ends"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_02_30.png" alt="基本块是连续、无控制流分叉的指令序列" loading="lazy">
+  <p class="video-caption">📷 基本块是连续、无控制流分叉的指令序列<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=150" target="_blank" rel="noopener">回到原视频 (00:02:30)</a></p>
+</div>
+
+<h3 id="13-jit">1.3 JIT：把基本块变成本机代码</h3>
+<p><em>(参考时间: 00:03)</em></p>
+<p>最直接的方法：</p>
+<ol>
+<li>把基本块转写成 C 函数；</li>
+<li>调用本机 C 编译器；</li>
+<li>生成 <code>.so</code>；</li>
+<li><code>dlopen</code> 加载；</li>
+<li>解析 relocation；</li>
+<li>跳转执行。</li>
+</ol>
+<p>概念代码：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">basic_block</span><span class="p">(</span><span class="n">CPUState</span><span class="w"> </span><span class="o">*</span><span class="n">cpu</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">cpu</span><span class="o">-&gt;</span><span class="n">eax</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="n">cpu</span><span class="o">-&gt;</span><span class="n">ebx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>编译器可以把立即数直接编码进机器指令，避免运行时再次译码。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["Guest Basic Block"] --&gt; B["Generate C"]
+    B --&gt; C["Native Compiler"]
+    C --&gt; D[".so / Native Code"]
+    D --&gt; E["dlopen + Relocate"]
+    E --&gt; F["Jump and Execute"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_04_30.png" alt="把基本块编译成本机代码可以显著提高模拟性能" loading="lazy">
+  <p class="video-caption">📷 把基本块编译成本机代码可以显著提高模拟性能<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=270" target="_blank" rel="noopener">回到原视频 (00:04:30)</a></p>
+</div>
+
+<h3 id="14">1.4 只编译热点</h3>
+<p><em>(参考时间: 00:06)</em></p>
+<p>每个基本块都调用一次外部编译器不可接受：</p>
+<ul>
+<li>编译器启动成本约几十到几百毫秒；</li>
+<li>只执行一次的基本块编译收益为负。</li>
+</ul>
+<p>实际 JIT 通常使用分层策略：</p>
+<div class="highlight"><pre><span></span><code>解释执行
+  ↓ 统计执行次数
+热点超过阈值
+  ↓ 后台编译
+缓存本机代码
+  ↓ 下次直接跳转
+</code></pre></div>
+
+<p>Java VM、Node.js VM 等也使用类似机制。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["Interpret Basic Block"] --&gt; B["Increment Hot Counter"]
+    B --&gt; C{"Hot Enough?"}
+    C -- "否" --&gt; A
+    C -- "是" --&gt; D["Compile in Background"]
+    D --&gt; E["Cache Native Code"]
+    E --&gt; F["Future Direct Jump"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_06_30.png" alt="JIT 只编译反复执行的热点基本块" loading="lazy">
+  <p class="video-caption">📷 JIT 只编译反复执行的热点基本块<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=390" target="_blank" rel="noopener">回到原视频 (00:06:30)</a></p>
+</div>
+
+<hr />
+<h2 id="2-qemu-dyngen">2. QEMU dyngen：模板拼接与重定位</h2>
+<h3 id="21">2.1 不调用外部编译器</h3>
+<p><em>(参考时间: 00:08)</em></p>
+<p>QEMU 早期方案希望同时满足：</p>
+<ul>
+<li>跨主机架构；</li>
+<li>无需每个 basic block 调外部编译器；</li>
+<li>比纯解释执行快。</li>
+</ul>
+<p>核心想法：</p>
+<blockquote>
+<p>预先编译“单条 Guest 指令的代码模板”，运行时把模板拷贝并修补。</p>
+</blockquote>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A["Guest Instruction Template"] --&gt; B["Native Instruction Blocks"]
+    B --&gt; C["memcpy into Basic Block"]
+    C --&gt; D["Patch Immediate / Relocation"]
+    D --&gt; E["Execute"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_09_00.png" alt="动态生成器复用预编译模板，不调用外部编译器" loading="lazy">
+  <p class="video-caption">📷 动态生成器复用预编译模板，不调用外部编译器<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=540" target="_blank" rel="noopener">回到原视频 (00:09:00)</a></p>
+</div>
+
+<h3 id="22-guest">2.2 单条 Guest 指令拆成三条本机操作</h3>
+<p><em>(参考时间: 00:10)</em></p>
+<p>以 <code>addi r1, r1, -16</code> 为例：</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// T0 is a temporary host register.</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">op_addl_T0_im</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">T0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">T0</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">((</span><span class="kt">long</span><span class="p">)(</span><span class="o">&amp;</span><span class="n">__op_param1</span><span class="p">));</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>对应步骤：</p>
+<div class="highlight"><pre><span></span><code>1. mov T0, guest_r1
+2. add T0, immediate
+3. mov guest_r1, T0
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A["Guest R1"] --&gt; B["Move to Host T0"]
+    C["Immediate"] --&gt; D["Add to T0"]
+    B --&gt; D
+    D --&gt; E["Move T0 to Guest R1"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_11_00.png" alt="ADD immediate 被拆成三条可复用本机模板" loading="lazy">
+  <p class="video-caption">📷 ADD immediate 被拆成三条可复用本机模板<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=660" target="_blank" rel="noopener">回到原视频 (00:11:00)</a></p>
+</div>
+
+<h3 id="23-placeholder-relocation">2.3 Placeholder 与 relocation</h3>
+<p><em>(参考时间: 00:12)</em></p>
+<p>模板先编译成一段本机机器码，并把未知立即数留作 placeholder：</p>
+<div class="highlight"><pre><span></span><code>mov T0, guest_r1
+add T0, 0x00000000   ; patch location
+mov guest_r1, T0
+</code></pre></div>
+
+<p>运行时：</p>
+<ol>
+<li>复制模板；</li>
+<li>找到 relocation 位置；</li>
+<li>写入真实立即数；</li>
+<li>执行拼接后的 basic block。</li>
+</ol>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["Template"] --&gt; B["memcpy"]
+    B --&gt; C["Find Relocation Slot"]
+    C --&gt; D["Patch Immediate"]
+    D --&gt; E["Host Basic Block"]
+    E --&gt; F["Native Execution"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_13_30.png" alt="模板拼接后只需少量字节修补即可执行" loading="lazy">
+  <p class="video-caption">📷 模板拼接后只需少量字节修补即可执行<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=810" target="_blank" rel="noopener">回到原视频 (00:13:30)</a></p>
+</div>
+
+<hr />
+<h2 id="3-discovmware">3. Disco、VMware 与虚拟化的黄金时代</h2>
+<h3 id="31-1970">3.1 1970 年代的想法重新复活</h3>
+<p><em>(参考时间: 00:16)</em></p>
+<p>Disco（SOSP '97）重新提出 Virtual Machine Monitor：</p>
+<ul>
+<li>一台物理机运行多个完整操作系统；</li>
+<li>每个 Guest OS 看到独立的虚拟硬件；</li>
+<li>通过直接执行和受控陷入获得接近原生的性能。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    HW["Physical Hardware"] --&gt; VMM["Disco VMM"]
+    VMM --&gt; G1["Guest OS 1"]
+    VMM --&gt; G2["Guest OS 2"]
+    VMM --&gt; G3["Guest OS N"]
+    G1 --&gt; A1["Applications"]
+    G2 --&gt; A2["Database / NFS"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_17_30.png" alt="Disco 在同一物理机上运行多个完整 Guest OS" loading="lazy">
+  <p class="video-caption">📷 Disco 在同一物理机上运行多个完整 Guest OS<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=1050" target="_blank" rel="noopener">回到原视频 (00:17:30)</a></p>
+</div>
+
+<h3 id="32-dot-comisp">3.2 Dot-com、ISP 与超卖</h3>
+<p><em>(参考时间: 00:19)</em></p>
+<p>2000 年前后：</p>
+<ul>
+<li>应用常由 ISP 租用物理服务器；</li>
+<li>BBS、邮件、网页服务 CPU 空闲率经常超过 80% 到 90%；</li>
+<li>虚拟机可以承诺“与物理机使用体验相同”；</li>
+<li>一台物理机切分后卖给多个用户；</li>
+<li>云厂商会进一步 <code>oversubscribe</code>。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    PHYS["One Physical Server"] --&gt; V1["VM 1: BBS"]
+    PHYS --&gt; V2["VM 2: Mail"]
+    PHYS --&gt; V3["VM 3: Web"]
+    V1 --&gt; IDLE["Mostly Idle"]
+    V2 --&gt; IDLE
+    V3 --&gt; IDLE
+    IDLE --&gt; SELL["Oversubscribe to More Tenants"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_21_30.png" alt="低利用率服务器通过虚拟机超卖获得更多收入" loading="lazy">
+  <p class="video-caption">📷 低利用率服务器通过虚拟机超卖获得更多收入<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=1290" target="_blank" rel="noopener">回到原视频 (00:21:30)</a></p>
+</div>
+
+<h3 id="33-vmware">3.3 VMware</h3>
+<p><em>(参考时间: 00:24)</em></p>
+<p>Mendel Rosenblum 与团队的 Disco 技术最终催生 VMware：</p>
+<ul>
+<li>虚拟机和物理机使用方式一致；</li>
+<li>Guest OS 无需修改；</li>
+<li>VM 成为数据中心基础设施；</li>
+<li>后续影响 CPU 硬件虚拟化。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A["Disco Paper"] --&gt; B["VMware VMM"]
+    B --&gt; C["Enterprise Virtualization"]
+    C --&gt; D["Cloud Infrastructure"]
+    D --&gt; E["Hardware Virtualization"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_24_30.png" alt="Disco 研究技术最终形成 VMware 商业生态" loading="lazy">
+  <p class="video-caption">📷 Disco 研究技术最终形成 VMware 商业生态<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=1470" target="_blank" rel="noopener">回到原视频 (00:24:30)</a></p>
+</div>
+
+<h3 id="34">3.4 大学、论文与品味</h3>
+<p><em>(参考时间: 00:28)</em></p>
+<p>讲师在这里插入一段关于科研的评论：</p>
+<ul>
+<li>论文不是给项目凑数；</li>
+<li>不应隐藏不利数据或选择性报告；</li>
+<li>Benchmark crime 会污染后续研究；</li>
+<li>好的工作往往“复活一个过去无法实现的想法”。</li>
+</ul>
+<p>Disco 的价值不只是实现了虚拟化，还重新点燃了 1970 年代虚拟机监控器的路线。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["Real Problem"] --&gt; B["Good Taste"]
+    B --&gt; C["New Mechanism"]
+    C --&gt; D["Reproducible Evaluation"]
+    D --&gt; E["Long-Term Research"]
+    F["Paper Factory"] --&gt; G["Benchmark Crime"]
+    G --&gt; H["Polluted Literature"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_29_00.png" alt="科研需要品味、诚实评测和长期影响" loading="lazy">
+  <p class="video-caption">📷 科研需要品味、诚实评测和长期影响<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=1740" target="_blank" rel="noopener">回到原视频 (00:29:00)</a></p>
+</div>
+
+<h3 id="35-y-combinator">3.5 Y Combinator 与“元机制”</h3>
+<p><em>(参考时间: 00:26)</em></p>
+<p>课程提到 Paul Graham 创办 Y Combinator，并用 Y 组合子作为名字：</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">Y</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="n">wrapper</span><span class="p">)(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">wrapper</span>
+
+<span class="n">factorial</span> <span class="o">=</span> <span class="n">Y</span><span class="p">(</span><span class="k">lambda</span> <span class="n">f</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">n</span><span class="p">:</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="k">else</span> <span class="n">n</span> <span class="o">*</span> <span class="n">f</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+</code></pre></div>
+
+<p>讲师把它类比为“能够不断生成方法的元机制”：</p>
+<ul>
+<li>技术浪潮会变化；</li>
+<li>选择正确问题的方法仍会重复出现；</li>
+<li>会学习、会迁移，比死记结论更重要。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A["Y Combinator"] --&gt; B["Recursive Mechanism"]
+    B --&gt; C["Produce More Methods"]
+    C --&gt; D["Adapt to New Problems"]
+    D --&gt; E["Meta-Mechanism"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_26_30.png" alt="Y 组合子被用作“生成方法的元机制”比喻" loading="lazy">
+  <p class="video-caption">📷 Y 组合子被用作“生成方法的元机制”比喻<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=1590" target="_blank" rel="noopener">回到原视频 (00:26:30)</a></p>
+</div>
+
+<h3 id="36">3.6 从分数到更大的世界</h3>
+<p><em>(参考时间: 00:38)</em></p>
+<p>讲师回应“最后两个实验考试会考吗”，指出分数通常很重要，但不应成为唯一动力：</p>
+<ul>
+<li>评价标准变化后仍要能选择问题；</li>
+<li>环境和见闻会影响品味；</li>
+<li>好的技术工作可以改变世界；</li>
+<li>不要只做 reward hacking。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["Score-Driven Learning"] --&gt; B{"Score Still Matters?"}
+    B -- "是" --&gt; A
+    B -- "否" --&gt; C["No Internal Direction"]
+    D["Problem-Driven Learning"] --&gt; E["Technical Taste"]
+    E --&gt; F["Can Choose New Problems"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_38_00.png" alt="只追求分数会在评价标准变化后失去方向" loading="lazy">
+  <p class="video-caption">📷 只追求分数会在评价标准变化后失去方向<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=2280" target="_blank" rel="noopener">回到原视频 (00:38:00)</a></p>
+</div>
+
+<hr />
+<h2 id="4-vmm">4. VMM 直接执行与影子页表</h2>
+<h3 id="41">4.1 用户代码可以直接执行</h3>
+<p><em>(参考时间: 00:40)</em></p>
+<p>同架构下，Guest 用户态代码与 Host 用户态代码可以使用同一套指令：</p>
+<ul>
+<li>Guest Ring 3 代码在 Host Ring 3 执行；</li>
+<li>普通计算无需模拟；</li>
+<li>系统调用等特权边界需要拦截。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["Guest User Code"] --&gt; B["Host Ring 3"]
+    B --&gt; C{"Privileged Operation?"}
+    C -- "否" --&gt; D["Execute Natively"]
+    C -- "是" --&gt; E["Trap to VMM"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_41_00.png" alt="普通 Guest 用户态代码可以直接在 Host 上执行" loading="lazy">
+  <p class="video-caption">📷 普通 Guest 用户态代码可以直接在 Host 上执行<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=2460" target="_blank" rel="noopener">回到原视频 (00:41:00)</a></p>
+</div>
+
+<h3 id="42-vr">4.2 页表就是 VR 眼镜</h3>
+<p><em>(参考时间: 00:42)</em></p>
+<p>页表把虚拟页映射到物理页，并附带权限：</p>
+<div class="highlight"><pre><span></span><code>Virtual Page 1 -&gt; Physical Page 1
+Virtual Page 2 -&gt; Physical Page 3
+Virtual Page 3 -&gt; Physical Page 8
+</code></pre></div>
+
+<p>Guest OS 认为自己拥有物理内存，并可以修改 CR3、页表项和其他控制寄存器。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    VPN1["VPN 1"] --&gt; PFN1["Guest PFN 1"]
+    VPN2["VPN 2"] --&gt; PFN3["Guest PFN 3"]
+    VPN3["VPN 3"] --&gt; PFN8["Guest PFN 8"]
+    CR3["CR3"] --&gt; ROOT["Page Table Root"]
+    ROOT --&gt; VPN1
+    ROOT --&gt; VPN2
+    ROOT --&gt; VPN3
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_43_30.png" alt="Guest OS 通过 CR3 和页表控制自己的虚拟地址空间" loading="lazy">
+  <p class="video-caption">📷 Guest OS 通过 CR3 和页表控制自己的虚拟地址空间<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=2610" target="_blank" rel="noopener">回到原视频 (00:43:30)</a></p>
+</div>
+
+<h3 id="43-ring-1-trap">4.3 Ring 1、指令扫描与 Trap</h3>
+<p><em>(参考时间: 00:45)</em></p>
+<p>VMware 式方案把 Guest Kernel 放在较低权限，使特权操作陷入 VMM。若硬件权限级不够，还可以：</p>
+<ul>
+<li>扫描 Guest Kernel；</li>
+<li>对危险指令打补丁；</li>
+<li>用 breakpoint 式机制替换成 trap；</li>
+<li>在 trap 中模拟或修正行为。</li>
+</ul>
+<p>只有少数特权操作需要陷入，绝大多数内核代码仍以本机速度执行。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["Guest Kernel"] --&gt; B["Ring 1 / Patched Privilege Instructions"]
+    B --&gt; C{"Dangerous Instruction?"}
+    C -- "否" --&gt; D["Execute Natively"]
+    C -- "是" --&gt; E["Trap into VMM"]
+    E --&gt; F["Emulate / Fix State"]
+    F --&gt; D
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_46_30.png" alt="只有系统级副作用指令需要陷入 VMM" loading="lazy">
+  <p class="video-caption">📷 只有系统级副作用指令需要陷入 VMM<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=2790" target="_blank" rel="noopener">回到原视频 (00:46:30)</a></p>
+</div>
+
+<h3 id="44-shadow-page-table">4.4 Shadow Page Table</h3>
+<p><em>(参考时间: 00:47)</em></p>
+<p>Guest 的“物理地址”仍然是 Host 的虚拟地址，因此 VMM 必须维护影子页表：</p>
+<div class="highlight"><pre><span></span><code>Guest VPN 1 -&gt; Guest PFN 1 -&gt; Host PFN 4
+Guest VPN 2 -&gt; Guest PFN 3 -&gt; Host PFN 8
+Guest VPN 3 -&gt; Guest PFN 8 -&gt; Host PFN 12
+</code></pre></div>
+
+<p>Guest 修改自己的页表时，VMM 拦截并更新影子页表；Guest 切 CR3 时，VMM 装入对应的影子页表。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    G["Guest Page Table"] --&gt; S["Shadow Page Table"]
+    S --&gt; H["Host Physical Memory"]
+    CR3["Guest writes CR3"] --&gt; T["Trap to VMM"]
+    T --&gt; U["Select Shadow Root"]
+    U --&gt; S
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_48_30.png" alt="影子页表把 Guest 物理地址再次映射到真实物理内存" loading="lazy">
+  <p class="video-caption">📷 影子页表把 Guest 物理地址再次映射到真实物理内存<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=2910" target="_blank" rel="noopener">回到原视频 (00:48:30)</a></p>
+</div>
+
+<h3 id="45">4.5 硬件虚拟化</h3>
+<p><em>(参考时间: 00:49)</em></p>
+<p>硬件逐渐加入支持：</p>
+<ul>
+<li>Intel VT-x（2005）；</li>
+<li>VT-d（2006）；</li>
+<li>EPT（2008）；</li>
+<li>Xen paravirtualization；</li>
+<li>VIRTIO 虚拟 I/O。</li>
+</ul>
+<p>CPU 可以原生执行部分特权操作，只在必要事件上产生 VM Exit；二级页表由硬件完成。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A["Software VMM"] --&gt; B["VT-x"]
+    B --&gt; C["VT-d / IOMMU"]
+    C --&gt; D["EPT / Nested Paging"]
+    D --&gt; E["VIRTIO"]
+    E --&gt; F["Fast Hardware Virtualization"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_50_30.png" alt="硬件虚拟化把影子页表和特权陷入逐步下沉到 CPU" loading="lazy">
+  <p class="video-caption">📷 硬件虚拟化把影子页表和特权陷入逐步下沉到 CPU<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=3030" target="_blank" rel="noopener">回到原视频 (00:50:30)</a></p>
+</div>
+
+<h3 id="45-revirt">4.5 ReVirt：记录并重放整台机器</h3>
+<p><em>(参考时间: 00:52)</em></p>
+<p>ReVirt 记录虚拟机执行中的非确定性外部输入：</p>
+<ul>
+<li>中断；</li>
+<li>设备输入；</li>
+<li>时间；</li>
+<li>网络数据。</li>
+</ul>
+<p>记录这些事件后，可以逐指令重放整个系统。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["VM Execution"] --&gt; B["Record External Inputs"]
+    B --&gt; C["Replay Log"]
+    C --&gt; D["Instruction-by-Instruction Replay"]
+    D --&gt; E["Intrusion / Bug Analysis"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_52_30.png" alt="记录外部输入即可重放虚拟机长期执行历史" loading="lazy">
+  <p class="video-caption">📷 记录外部输入即可重放虚拟机长期执行历史<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=3150" target="_blank" rel="noopener">回到原视频 (00:52:30)</a></p>
+</div>
+
+<h3 id="46">4.6 空间迁移</h3>
+<p><em>(参考时间: 00:53)</em></p>
+<p>虚拟机状态可以看作一块内存：</p>
+<ol>
+<li>暂停 VM；</li>
+<li>断开或重定向设备；</li>
+<li>把内存和状态迁移到另一台机器；</li>
+<li>在新机器恢复执行。</li>
+</ol>
+<p>这就是 Live Migration 的基础。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A["Source Host VM"] --&gt; B["Pause / Snapshot"]
+    B --&gt; C["Transfer Memory + State"]
+    C --&gt; D["Destination Host VM"]
+    D --&gt; E["Resume"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_53_30.png" alt="虚拟机状态迁移让计算可以在机器之间移动" loading="lazy">
+  <p class="video-caption">📷 虚拟机状态迁移让计算可以在机器之间移动<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=3210" target="_blank" rel="noopener">回到原视频 (00:53:30)</a></p>
+</div>
+
+<hr />
+<h2 id="5">5. 换一条路线：操作系统自己虚拟化自己</h2>
+<h3 id="51-osid">5.1 OSID：为每个对象增加命名空间编号</h3>
+<p><em>(参考时间: 00:54)</em></p>
+<p>虚拟机把整台机器虚拟化；操作系统级虚拟化则直接让多个“小操作系统”共享一个内核。</p>
+<p>概念模型：</p>
+<div class="highlight"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">proc</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">pid</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">osid</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// ...</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>所有对象都属于某个 OSID：</p>
+<ul>
+<li>进程；</li>
+<li>用户；</li>
+<li>文件系统视图；</li>
+<li>IPC；</li>
+<li>网络；</li>
+<li>时间与主机名。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    K["One Kernel"] --&gt; O1["OSID 1"]
+    K --&gt; O2["OSID 2"]
+    O1 --&gt; P11["PID 1"]
+    O1 --&gt; P12["PID 2"]
+    O2 --&gt; P21["PID 1"]
+    O2 --&gt; P22["PID 2"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_54_30.png" alt="OSID 让不同命名空间拥有独立的 PID 空间" loading="lazy">
+  <p class="video-caption">📷 OSID 让不同命名空间拥有独立的 PID 空间<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=3270" target="_blank" rel="noopener">回到原视频 (00:54:30)</a></p>
+</div>
+
+<h3 id="52-pid">5.2 PID 隔离示例</h3>
+<p><em>(参考时间: 00:56)</em></p>
+<p>每个 OSID 都可以有自己的 <code>PID 1</code>：</p>
+<ul>
+<li>从一个 OSID 出发，只能看到同 OSID 的进程；</li>
+<li><code>kill</code>、<code>wait</code>、<code>proc</code> 遍历都受到 OSID 过滤；</li>
+<li>新进程继承父进程 OSID；</li>
+<li>全局可以重新编号 PID，也可以为每个命名空间单独分配。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["Process with OSID 1"] --&gt; B["List / Kill"]
+    B --&gt; C{"Target OSID == 1?"}
+    C -- "是" --&gt; D["Visible / Accessible"]
+    C -- "否" --&gt; E["Not Found"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_56_30.png" alt="OSID 过滤使不同隔离域看不到彼此进程" loading="lazy">
+  <p class="video-caption">📷 OSID 过滤使不同隔离域看不到彼此进程<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=3390" target="_blank" rel="noopener">回到原视频 (00:56:30)</a></p>
+</div>
+
+<h3 id="53-pid-leaky-abstraction">5.3 PID 是 leaky abstraction</h3>
+<p><em>(参考时间: 00:58)</em></p>
+<p>PID 会被回收，经典 TOCTTOU：</p>
+<div class="highlight"><pre><span></span><code>ps<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>SomeProcess
+sleep<span class="w"> </span>...
+<span class="nb">kill</span><span class="w"> </span>&lt;pid&gt;
+</code></pre></div>
+
+<p>如果原进程退出且 PID 被复用，<code>kill</code> 可能杀掉另一个进程。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant User
+    participant Kernel
+    User-&gt;&gt;Kernel: ps, read PID 31181
+    Kernel--&gt;&gt;User: PID 31181
+    Kernel-&gt;&gt;Kernel: process exits
+    Kernel-&gt;&gt;Kernel: PID reused
+    User-&gt;&gt;Kernel: kill 31181
+    Kernel--&gt;&gt;User: kills wrong process
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_58_30.png" alt="PID 回收产生 TOCTTOU 风险" loading="lazy">
+  <p class="video-caption">📷 PID 回收产生 TOCTTOU 风险<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=3510" target="_blank" rel="noopener">回到原视频 (00:58:30)</a></p>
+</div>
+
+<h3 id="54-pidfd">5.4 <code>pidfd</code></h3>
+<p><em>(参考时间: 01:00)</em></p>
+<p>Linux 增加：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">int</span><span class="w"> </span><span class="n">fd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pidfd_open</span><span class="p">(</span><span class="n">pid</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="n">pidfd_send_signal</span><span class="p">(</span><span class="n">fd</span><span class="p">,</span><span class="w"> </span><span class="n">SIGTERM</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+</code></pre></div>
+
+<p><code>pidfd</code> 是稳定引用，持有期间进程结构不会被回收，因此不会误杀复用 PID。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A["PID"] --&gt; B["pidfd_open()"]
+    B --&gt; C["Stable FD Reference"]
+    C --&gt; D["pidfd_send_signal()"]
+    D --&gt; E["Correct Process"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_00_30.png" alt="pidfd 用文件描述符消除 PID 复用歧义" loading="lazy">
+  <p class="video-caption">📷 pidfd 用文件描述符消除 PID 复用歧义<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=3630" target="_blank" rel="noopener">回到原视频 (01:00:30)</a></p>
+</div>
+
+<hr />
+<h2 id="6-chroot">6. chroot：最早的文件命名空间隔离</h2>
+<p><em>(参考时间: 01:01)</em></p>
+<p>Version 7 Unix 已提供：</p>
+<div class="highlight"><pre><span></span><code><span class="n">chroot</span><span class="p">(</span><span class="s">"/path/to/new/root"</span><span class="p">);</span>
+</code></pre></div>
+
+<p>进程看到的 <code>/</code> 变成指定目录：</p>
+<div class="highlight"><pre><span></span><code>Host /srv/container
+  bin/
+  lib/
+  home/
+
+Process sees:
+  /bin
+  /lib
+  /home
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["Host Filesystem"] --&gt; B["/srv/container"]
+    B --&gt; C["New Root"]
+    C --&gt; D["/bin"]
+    C --&gt; E["/lib"]
+    C --&gt; F["/home"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_01_30.png" alt="chroot 把进程文件系统视图限制在子目录内" loading="lazy">
+  <p class="video-caption">📷 chroot 把进程文件系统视图限制在子目录内<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=3690" target="_blank" rel="noopener">回到原视频 (01:01:30)</a></p>
+</div>
+
+<h3 id="61-chroot">6.1 chroot 的限制</h3>
+<p><em>(参考时间: 01:03)</em></p>
+<p>chroot 只隔离文件系统视图：</p>
+<ul>
+<li>PID 未隔离；</li>
+<li>用户未隔离；</li>
+<li>网络未隔离；</li>
+<li>IPC 未隔离；</li>
+<li>逃逸手段很多。</li>
+</ul>
+<p>尝试 <code>chroot</code> 到一个不完整的目录时，连 shell 所需的 <code>/bin/sh</code> 都不存在。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["chroot only"] --&gt; B["Filesystem View"]
+    A --&gt; C["Shared PID"]
+    A --&gt; D["Shared Users"]
+    A --&gt; E["Shared Network"]
+    A --&gt; F["Shared IPC"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_03_30.png" alt="chroot 只隔离文件系统命名空间" loading="lazy">
+  <p class="video-caption">📷 chroot 只隔离文件系统命名空间<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=3810" target="_blank" rel="noopener">回到原视频 (01:03:30)</a></p>
+</div>
+
+<hr />
+<h2 id="7-linux-namespaces">7. Linux Namespaces</h2>
+<h3 id="71">7.1 需要隔离哪些对象</h3>
+<p><em>(参考时间: 01:04)</em></p>
+<p>从操作系统对象出发，可以枚举命名空间：</p>
+<ul>
+<li><strong>pid</strong>：进程 ID；</li>
+<li><strong>user</strong>：用户和组；</li>
+<li><strong>mnt</strong>：挂载点与文件系统；</li>
+<li><strong>ipc</strong>：信号量、消息队列、共享内存；</li>
+<li><strong>net</strong>：网络设备、协议栈、端口；</li>
+<li><strong>time</strong>：系统时间和时区；</li>
+<li><strong>uts</strong>：主机名和域名；</li>
+<li><strong>cgroup</strong>：cgroup 视图。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["Namespace Types"] --&gt; B["pid"]
+    A --&gt; C["user"]
+    A --&gt; D["mnt"]
+    A --&gt; E["ipc"]
+    A --&gt; F["net"]
+    A --&gt; G["time"]
+    A --&gt; H["uts"]
+    A --&gt; I["cgroup"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_04_30.png" alt="命名空间覆盖操作系统中的主要共享对象" loading="lazy">
+  <p class="video-caption">📷 命名空间覆盖操作系统中的主要共享对象<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=3870" target="_blank" rel="noopener">回到原视频 (01:04:30)</a></p>
+</div>
+
+<h3 id="72">7.2 创建和切换命名空间</h3>
+<p><em>(参考时间: 01:05)</em></p>
+<p>常用 API：</p>
+<div class="highlight"><pre><span></span><code><span class="n">clone</span><span class="p">(...,</span><span class="w"> </span><span class="n">CLONE_NEWPID</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">CLONE_NEWNS</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">CLONE_NEWNET</span><span class="p">,</span><span class="w"> </span><span class="p">...);</span>
+<span class="n">unshare</span><span class="p">(</span><span class="n">CLONE_NEWPID</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">CLONE_NEWNET</span><span class="p">);</span>
+<span class="n">setns</span><span class="p">(</span><span class="n">fd</span><span class="p">,</span><span class="w"> </span><span class="n">CLONE_NEWNET</span><span class="p">);</span>
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A["clone(CLONE_NEWXXX)"] --&gt; B["New Namespace at Process Creation"]
+    C["unshare(CLONE_NEWXXX)"] --&gt; D["Move Current Process"]
+    E["setns(fd, CLONE_NEWXXX)"] --&gt; F["Join Existing Namespace"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_05_30.png" alt="clone、unshare、setns 创建或切换命名空间" loading="lazy">
+  <p class="video-caption">📷 clone、unshare、setns 创建或切换命名空间<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=3930" target="_blank" rel="noopener">回到原视频 (01:05:30)</a></p>
+</div>
+
+<h3 id="73-procpidns">7.3 <code>/proc/[pid]/ns/</code></h3>
+<p><em>(参考时间: 01:06)</em></p>
+<p>每个进程都有命名空间引用：</p>
+<div class="highlight"><pre><span></span><code>/proc/&lt;pid&gt;/ns/
+  pid
+  user
+  mnt
+  ipc
+  net
+  uts
+  time
+  cgroup
+</code></pre></div>
+
+<p><code>lsns</code> 可以列出系统中的命名空间。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["/proc/pid/ns"] --&gt; B["pid"]
+    A --&gt; C["mnt"]
+    A --&gt; D["net"]
+    A --&gt; E["user"]
+    A --&gt; F["ipc"]
+    A --&gt; G["uts"]
+    A --&gt; H["time"]
+    A --&gt; I["cgroup"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_06_30.png" alt="procfs 暴露每个进程所属的命名空间引用" loading="lazy">
+  <p class="video-caption">📷 procfs 暴露每个进程所属的命名空间引用<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=3990" target="_blank" rel="noopener">回到原视频 (01:06:30)</a></p>
+</div>
+
+<h3 id="74">7.4 命名空间可以组合</h3>
+<p><em>(参考时间: 01:08)</em></p>
+<p>两个进程可以：</p>
+<ul>
+<li>共享 <code>net</code>；</li>
+<li>使用不同 <code>mnt</code>；</li>
+<li>使用不同 <code>ipc</code>；</li>
+<li>使用不同 <code>user</code>。</li>
+</ul>
+<p>不必所有命名空间都一起隔离。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    P1["Process 1"] --&gt; N1["Shared Net NS"]
+    P2["Process 2"] --&gt; N1
+    P1 --&gt; M1["Mount NS A"]
+    P2 --&gt; M2["Mount NS B"]
+    P1 --&gt; U1["User NS A"]
+    P2 --&gt; U2["User NS B"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_08_30.png" alt="不同进程可以共享部分命名空间并隔离其他部分" loading="lazy">
+  <p class="video-caption">📷 不同进程可以共享部分命名空间并隔离其他部分<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=4110" target="_blank" rel="noopener">回到原视频 (01:08:30)</a></p>
+</div>
+
+<hr />
+<h2 id="8-cgroups">8. cgroups：资源控制</h2>
+<h3 id="81">8.1 命名空间不等于资源限制</h3>
+<p><em>(参考时间: 01:09)</em></p>
+<p>命名空间解决“看不看得见”，但不解决“能用多少资源”：</p>
+<ul>
+<li>CPU 时间；</li>
+<li>内存；</li>
+<li>文件系统带宽；</li>
+<li>网络带宽；</li>
+<li>进程数量；</li>
+<li>文件描述符。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A["Namespaces"] --&gt; B["Visibility Isolation"]
+    C["cgroups"] --&gt; D["Resource Control"]
+    B --&gt; E["Container Isolation"]
+    D --&gt; E
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_09_30.png" alt="命名空间负责可见性，cgroup 负责资源配额" loading="lazy">
+  <p class="video-caption">📷 命名空间负责可见性，cgroup 负责资源配额<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=4170" target="_blank" rel="noopener">回到原视频 (01:09:30)</a></p>
+</div>
+
+<h3 id="82-cpu">8.2 CPU 计费</h3>
+<p><em>(参考时间: 01:10)</em></p>
+<p>cgroup 可以把一组进程看作一个调度实体：</p>
+<div class="highlight"><pre><span></span><code>cgroup A: CPU time count
+cgroup B: CPU time count
+cgroup C: CPU time count
+</code></pre></div>
+
+<p>策略可以规定：</p>
+<ul>
+<li>最多使用 20% CPU；</li>
+<li>多个 cgroup 公平分享；</li>
+<li>cgroup 之间分层调度；</li>
+<li>设置 memory/IO 上限。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    ROOT["Root cgroup"] --&gt; A["Group A"]
+    ROOT --&gt; B["Group B"]
+    A --&gt; A1["Process 1"]
+    A --&gt; A2["Process 2"]
+    B --&gt; B1["Process 3"]
+    B --&gt; B2["Process 4"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_11_00.png" alt="cgroup 把进程组织成可设置资源策略的层级" loading="lazy">
+  <p class="video-caption">📷 cgroup 把进程组织成可设置资源策略的层级<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=4260" target="_blank" rel="noopener">回到原视频 (01:11:00)</a></p>
+</div>
+
+<h3 id="83-cgroup-v2">8.3 cgroup v2 的树结构</h3>
+<p><em>(参考时间: 01:11)</em></p>
+<div class="highlight"><pre><span></span><code>/sys/fs/cgroup/
+  system.slice/
+  user.slice/
+  docker/
+    container-a/
+    container-b/
+</code></pre></div>
+
+<p>每个层级可以采用不同分配策略。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    R["Root"] --&gt; S["System Slice"]
+    R --&gt; U["User Slice"]
+    S --&gt; D["Docker"]
+    D --&gt; A["Container A"]
+    D --&gt; B["Container B"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_11_30.png" alt="cgroup v2 允许在树的不同层级设置资源策略" loading="lazy">
+  <p class="video-caption">📷 cgroup v2 允许在树的不同层级设置资源策略<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=4290" target="_blank" rel="noopener">回到原视频 (01:11:30)</a></p>
+</div>
+
+<hr />
+<h2 id="9-namespaces-cgroups-overlayfs">9. 容器：Namespaces + cgroups + OverlayFS</h2>
+<h3 id="91-docker">9.1 组合出 Docker</h3>
+<p><em>(参考时间: 01:12)</em></p>
+<p>容器需要：</p>
+<ol>
+<li>namespaces：隔离对象视图；</li>
+<li>cgroups：控制资源；</li>
+<li>OverlayFS：共享只读镜像层，写时复制；</li>
+<li>chroot/pivot_root：构造独立的根文件系统。</li>
+</ol>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A["Namespaces"] --&gt; D["Container"]
+    B["cgroups"] --&gt; D
+    C["OverlayFS / Image Layers"] --&gt; D
+    E["chroot / pivot_root"] --&gt; D
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_12_30.png" alt="容器由命名空间、资源控制、分层镜像和独立根目录组合而成" loading="lazy">
+  <p class="video-caption">📷 容器由命名空间、资源控制、分层镜像和独立根目录组合而成<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=4350" target="_blank" rel="noopener">回到原视频 (01:12:30)</a></p>
+</div>
+
+<h3 id="92">9.2 容器与虚拟机</h3>
+<p><em>(参考时间: 01:13)</em></p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>虚拟机</th>
+<th>容器</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>隔离层</td>
+<td>虚拟硬件 + Guest Kernel</td>
+<td>共享 Host Kernel</td>
+</tr>
+<tr>
+<td>启动开销</td>
+<td>高</td>
+<td>低</td>
+</tr>
+<tr>
+<td>内存开销</td>
+<td>高</td>
+<td>通常更低</td>
+</tr>
+<tr>
+<td>隔离强度</td>
+<td>更强</td>
+<td>依赖内核隔离</td>
+</tr>
+<tr>
+<td>密度</td>
+<td>较低</td>
+<td>较高</td>
+</tr>
+</tbody>
+</table>
+<p>容器更轻量，但 Host Kernel 漏洞会影响隔离：</p>
+<ul>
+<li>越权读取其他容器；</li>
+<li>耗尽全局 fd 等资源；</li>
+<li>对其他容器形成 DoS。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["Host Kernel"] --&gt; B["Container A"]
+    A --&gt; C["Container B"]
+    D["Kernel Vulnerability"] --&gt; E["Cross-Container Impact"]
+    F["VM Hypervisor"] --&gt; G["Guest Kernel A"]
+    F --&gt; H["Guest Kernel B"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_13_30.png" alt="容器共享内核，隔离性和攻击面不同于虚拟机" loading="lazy">
+  <p class="video-caption">📷 容器共享内核，隔离性和攻击面不同于虚拟机<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=4410" target="_blank" rel="noopener">回到原视频 (01:13:30)</a></p>
+</div>
+
+<h3 id="93-freebsd-jailslxc-docker">9.3 FreeBSD Jails、LXC 与 Docker</h3>
+<p><em>(参考时间: 01:14)</em></p>
+<p>时间线：</p>
+<div class="highlight"><pre><span></span><code>1979  chroot
+2000  FreeBSD Jails
+2006  Linux namespaces + cgroups
+2008  LXC
+2013+ Docker / OCI / Kubernetes
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A["chroot 1979"] --&gt; B["FreeBSD Jails 2000"]
+    B --&gt; C["Namespaces + cgroups 2006"]
+    C --&gt; D["LXC 2008"]
+    D --&gt; E["Docker"]
+    E --&gt; F["Cloud Native"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_14_30.png" alt="操作系统级虚拟化早于容器热潮，并持续演化" loading="lazy">
+  <p class="video-caption">📷 操作系统级虚拟化早于容器热潮，并持续演化<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=4470" target="_blank" rel="noopener">回到原视频 (01:14:30)</a></p>
+</div>
+
+<h3 id="94-the-bitter-lesson-meta-mechanism">9.4 The Bitter Lesson 与 meta-mechanism</h3>
+<p><em>(参考时间: 01:15)</em></p>
+<p>课程再次引用 The Bitter Lesson：</p>
+<ul>
+<li>不要只堆积人类手工知识；</li>
+<li>寻找能随算力和规模增长的 meta-mechanism；</li>
+<li>Docker 与云原生是技术演进中的一种 meta-mechanism。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["Hand-Crafted Mechanism"] --&gt; B["Limited Scaling"]
+    C["Meta-Mechanism"] --&gt; D["Learns / Scales with Resources"]
+    D --&gt; E["Long-Term Advantage"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_15_30.png" alt="可扩展的元机制往往比手工设计赢得长期竞争" loading="lazy">
+  <p class="video-caption">📷 可扩展的元机制往往比手工设计赢得长期竞争<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=4530" target="_blank" rel="noopener">回到原视频 (01:15:30)</a></p>
+</div>
+
+<hr />
+<h2 id="10-kubernetes">10. Kubernetes：容器编排</h2>
+<h3 id="101-pod">10.1 声明式管理无状态 Pod</h3>
+<p><em>(参考时间: 01:18)</em></p>
+<p>Kubernetes 的目标：</p>
+<ul>
+<li>动态调度容器；</li>
+<li>自动伸缩；</li>
+<li>节点故障时重新部署；</li>
+<li>健康检查；</li>
+<li>负载均衡；</li>
+<li>统一访问和服务发现。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    D["Desired State"] --&gt; K["Kubernetes Control Plane"]
+    K --&gt; N1["Node 1"]
+    K --&gt; N2["Node 2"]
+    K --&gt; N3["Node 3"]
+    N1 --&gt; P1["Pod A"]
+    N2 --&gt; P2["Pod A'"]
+    N3 --&gt; P3["Pod B"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_18_00.png" alt="Kubernetes 持续把实际容器状态收敛到声明状态" loading="lazy">
+  <p class="video-caption">📷 Kubernetes 持续把实际容器状态收敛到声明状态<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=4680" target="_blank" rel="noopener">回到原视频 (01:18:00)</a></p>
+</div>
+
+<h3 id="102-gateway">10.2 Gateway 与服务路由</h3>
+<p><em>(参考时间: 01:19)</em></p>
+<p>客户端只需请求服务名：</p>
+<div class="highlight"><pre><span></span><code>request -&gt; Gateway API -&gt; Correct Pod
+</code></pre></div>
+
+<p>系统负责：</p>
+<ul>
+<li>服务发现；</li>
+<li>路由；</li>
+<li>健康检查；</li>
+<li>故障转移；</li>
+<li>负载均衡。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    C["Client"] --&gt; G["Gateway API"]
+    G --&gt; S["Service Name"]
+    S --&gt; P1["Pod 1"]
+    S --&gt; P2["Pod 2"]
+    S --&gt; P3["Pod 3"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_19_30.png" alt="Gateway 把服务名解析到健康容器自动路由" loading="lazy">
+  <p class="video-caption">📷 Gateway 把服务名解析到健康容器自动路由<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=4770" target="_blank" rel="noopener">回到原视频 (01:19:30)</a></p>
+</div>
+
+<h3 id="103">10.3 容器调度是背包问题</h3>
+<p><em>(参考时间: 01:20)</em></p>
+<p>每个容器有多维资源需求：</p>
+<div class="highlight"><pre><span></span><code>(CPU, Memory, GPU, IO, ...)
+</code></pre></div>
+
+<p>调度器希望用尽可能少的机器放下所有容器：</p>
+<ul>
+<li>多维 Bin Packing；</li>
+<li>NP-hard；</li>
+<li>集群动态变化；</li>
+<li>容器频繁创建、销毁和迁移；</li>
+<li>用户随时扩缩容。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    C1["Container: CPU / RAM"] --&gt; B["Bin Packing"]
+    C2["Container: CPU / RAM"] --&gt; B
+    C3["Container: CPU / RAM"] --&gt; B
+    B --&gt; N1["Node 1"]
+    B --&gt; N2["Node 2"]
+    B --&gt; N3["Node 3"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_20_30.png" alt="容器调度本质上是动态多维装箱问题" loading="lazy">
+  <p class="video-caption">📷 容器调度本质上是动态多维装箱问题<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=4830" target="_blank" rel="noopener">回到原视频 (01:20:30)</a></p>
+</div>
+
+<h3 id="104">10.4 静态论文假设与现实系统</h3>
+<p><em>(参考时间: 01:22)</em></p>
+<p>如果把容器调度写成静态整数线性规划，容易假设：</p>
+<ul>
+<li>某一瞬间知道全部容器；</li>
+<li>资源需求不变；</li>
+<li>节点稳定；</li>
+<li>不存在自动扩缩容；</li>
+<li>看不到厂商的隐藏压缩与超卖。</li>
+</ul>
+<p>真实集群中这些假设往往不成立，因此研究工作必须理解实际系统。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A["Static Optimization Paper"] --&gt; B["Fixed Container Set"]
+    B --&gt; C["Fixed Node Capacity"]
+    C --&gt; D["Offline ILP"]
+    E["Real Cluster"] --&gt; F["Dynamic Containers"]
+    F --&gt; G["Elastic Scaling"]
+    G --&gt; H["Failures / Migration / Oversubscription"]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_01_22_30.png" alt="静态优化假设经常无法覆盖真实集群的动态行为" loading="lazy">
+  <p class="video-caption">📷 静态优化假设经常无法覆盖真实集群的动态行为<br><a href="https://www.bilibili.com/video/BV1uaEB66EAH/?t=4950" target="_blank" rel="noopener">回到原视频 (01:22:30)</a></p>
+</div>
+
+<hr />
+<h2 id="11">11. 总结：三条虚拟化路线</h2>
+<h3 id="111">11.1 完整模拟</h3>
+<ul>
+<li>指令级解释；</li>
+<li>basic block JIT；</li>
+<li>模板拼接与 relocation；</li>
+<li>跨架构、灵活但开销大。</li>
+</ul>
+<h3 id="112">11.2 虚拟机监控器</h3>
+<ul>
+<li>Guest 用户代码直接执行；</li>
+<li>特权操作陷入；</li>
+<li>影子页表；</li>
+<li>硬件虚拟化、EPT、VIRTIO；</li>
+<li>强隔离，适合异构操作系统。</li>
+</ul>
+<h3 id="113">11.3 操作系统级虚拟化</h3>
+<ul>
+<li>OSID / namespaces；</li>
+<li>cgroups；</li>
+<li>chroot / OverlayFS；</li>
+<li>Docker、LXC、Kubernetes；</li>
+<li>轻量、密集、适合云原生服务。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A["Full Emulation"] --&gt; D["Isolation"]
+    B["VMM"] --&gt; D
+    C["OS-Level Virtualization"] --&gt; D
+    D --&gt; E["Cloud / Containers"]
+    E --&gt; F["Scale Out"]
+</code></pre></div>
+
+<p>最终结论：</p>
+<blockquote>
+<p>虚拟化不仅是“把一台机器变成多台”，更是不断重新定义边界：哪些状态要模拟，哪些代码可以直接执行，哪些资源可以共享，哪些对象必须隔离。</p>
+</blockquote>
+<hr />
+<h2 id="_3">附：官方参考与延伸阅读</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1aWVN6uEoY">PA4 x86 JIT 视频</a></li>
+<li><a href="https://www.usenix.org/conference/2005-usenix-annual-technical-conference/qemu-fast-and-portable-dynamic-translator">QEMU: A Fast and Portable Dynamic Translator</a></li>
+<li><a href="https://dl.acm.org/doi/10.1145/268998.266672">Disco: Running Commodity Operating Systems on Scalable Multiprocessors</a></li>
+<li><a href="https://www.ycombinator.com/">Y Combinator</a></li>
+<li><a href="https://gernot-heiser.org/benchmarking-crimes.html">Benchmark Crimes</a></li>
+<li><a href="https://dl.acm.org/doi/10.1145/1134760.1134767">Live updating operating systems using virtualization</a></li>
+<li><a href="https://dl.acm.org/doi/10.1145/1165389.945462">Xen and the Art of Virtualization</a></li>
+<li><a href="https://docs.oasis-open.org/virtio/virtio/v1.1/csprd01/virtio-v1.1-csprd01.html">VIRTIO 1.1</a></li>
+<li><a href="https://www.usenix.org/conference/osdi-02/revirt-enabling-intrusion-analysis-through-virtual-machine-logging-and-replay">ReVirt</a></li>
+<li><a href="https://www.usenix.org/conference/osdi-02/optimizing-migration-virtual-computers">Optimizing the Migration of Virtual Computers</a></li>
+<li><a href="https://docs.freebsd.org/en/books/handbook/jails/">FreeBSD Jails</a></li>
+<li><a href="https://www.cs.utexas.edu/~eunsol/courses/data/bitter_lesson.pdf">The Bitter Lesson</a></li>
+</ul>
+<p>官方课程资料：</p>
+<ul>
+<li><a href="https://jyywiki.cn/OS/2026/">课程主页</a></li>
+<li><a href="https://jyywiki.cn/OS/2026/lect29.md">第 29 讲讲义：虚拟机和容器</a></li>
+<li><a href="https://www.bilibili.com/video/BV1uaEB66EAH/">视频：29 - 虚拟机和容器</a></li>
+</ul>
+<blockquote>
+<p><strong>版权与署名</strong>：本讲课程材料由蒋炎岩（jyy）编写。课程讲义与幻灯片采用 <a href="http://creativecommons.org/licenses/by-nc/4.0/">Creative Commons BY-NC 4.0</a> 许可；本电子书保留课程出处、作者署名与许可说明。</p>
+</blockquote>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>
