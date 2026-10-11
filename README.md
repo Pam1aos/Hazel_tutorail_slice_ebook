@@ -36,6 +36,10 @@
   - [Markdown 版本](<Hazel Game Engine/019 - Input Polling/book.md>)
   - 视频来源：[Bilibili 精译版第 19 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=19)
   - 主题：事件与输入轮询、`Input` 静态接口、`WindowsInput`、`GetNativeWindow`、键盘鼠标查询和 Input 单例
+- [020 - Key and Mouse Codes](<Hazel Game Engine/020 - Key and Mouse Codes/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/020 - Key and Mouse Codes/book.md>)
+  - 视频来源：[Bilibili 精译版第 20 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=20)
+  - 主题：Hazel 键码与鼠标码、GLFW 常量隔离、Hazel.h 公共接口、轮询与事件比较和跨后端转换策略
 
 ## 南京大学操作系统原理 2026
 

@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 020：建立 Hazel 键码与鼠标码</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: #f3f4f6; font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+            code { overflow-wrap: anywhere; word-break: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-020-hazel">Hazel 游戏引擎笔记 020：建立 Hazel 键码与鼠标码</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=20">The Cherno 游戏引擎系列第 20 讲“键盘和鼠标代码”</a>，时长约 23 分 49 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。代码参考提交：<a href="https://github.com/TheCherno/Hazel/tree/6a5e6887"><code>6a5e6887</code></a>。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材；术语和代码以原视频及同期 Hazel 仓库为准。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>上一讲实现了输入轮询，但客户端仍需写：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Input</span><span class="o">::</span><span class="n">IsKeyPressed</span><span class="p">(</span><span class="n">GLFW_KEY_SPACE</span><span class="p">);</span>
+</code></pre></div>
+
+<p>这意味着使用 Hazel 的客户端必须包含 GLFW 头文件，并依赖 GLFW 的键码定义。GLFW 本来只是 Hazel 的内部平台实现，不应该泄漏到客户端 API。</p>
+<p>本讲建立 Hazel 自己的键码和鼠标按钮码：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Input</span><span class="o">::</span><span class="n">IsKeyPressed</span><span class="p">(</span><span class="n">HZ_KEY_SPACE</span><span class="p">);</span>
+<span class="n">Input</span><span class="o">::</span><span class="n">IsMouseButtonPressed</span><span class="p">(</span><span class="n">HZ_MOUSE_BUTTON_LEFT</span><span class="p">);</span>
+</code></pre></div>
+
+<p>目标是让客户端只依赖 Hazel，同时为将来更换窗口后端留下转换空间。</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[客户端] --&gt; B[Hazel Input API]
+    B --&gt; C[WindowsInput]
+    C --&gt; D[GLFW]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_01_04.png" alt="客户端不应为了检查按键而依赖 GLFW" loading="lazy">
+  <p class="video-caption">📷 客户端不应为了检查按键而依赖 GLFW<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=20&t=64" target="_blank" rel="noopener">回到原视频 (00:01:04)</a></p>
+</div>
+
+<h2 id="1-glfw-api">1. 为什么 GLFW 键码不能成为公共 API</h2>
+<p><em>(参考时间: 00:00:20)</em></p>
+<p>当前问题有两层。</p>
+<h3 id="11-api">1.1 公共 API 泄漏平台依赖</h3>
+<p>客户端应用只想检查空格键是否按下，却必须包含 GLFW：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;GLFW/glfw3.h&gt;</span>
+
+<span class="n">Input</span><span class="o">::</span><span class="n">IsKeyPressed</span><span class="p">(</span><span class="n">GLFW_KEY_SPACE</span><span class="p">);</span>
+</code></pre></div>
+
+<p>这会把 GLFW 从“Hazel 的内部实现细节”变成“客户端必须了解的依赖”。</p>
+<h3 id="12">1.2 不同窗口后端使用不同键码</h3>
+<p>GLFW 和 Win32 API 对同一个键可能给出完全不同的数值。例如 Tab：</p>
+<div class="highlight"><pre><span></span><code>GLFW_KEY_TAB = 258
+VK_TAB       = 9
+</code></pre></div>
+
+<p>如果 Hazel 将来在 Windows 改为直接使用 Win32，而在其它平台继续使用 GLFW，旧的 GLFW 常量就无法直接复用。</p>
+<p>需要选择一种长期稳定的内部编码，并在访问具体后端时完成转换。否则每个调用点都会被后端差异污染。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[同一个逻辑按键 Tab] --&gt; B[GLFW: 258]
+    A --&gt; C[Win32: 9]
+    B --&gt; D[后端实现差异]
+    C --&gt; D
+    D --&gt; E[必须在 Hazel 内部统一]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_05_41.png" alt="GLFW 的 Tab 键码为 258，而 Win32 的 VK_TAB 为 9" loading="lazy">
+  <p class="video-caption">📷 GLFW 的 Tab 键码为 258，而 Win32 的 VK_TAB 为 9<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=20&t=341" target="_blank" rel="noopener">回到原视频 (00:05:41)</a></p>
+</div>
+
+<h2 id="2-keycodesh">2. 创建 KeyCodes.h</h2>
+<p><em>(参考时间: 00:06:49)</em></p>
+<p>新增：</p>
+<div class="highlight"><pre><span></span><code>Hazel/src/Hazel/KeyCodes.h
+</code></pre></div>
+
+<p>最直接的做法是复制 GLFW 已定义好的键值，但把宏前綴从 <code>GLFW_</code> 改成 <code>HZ_</code>。例如：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#pragma once</span>
+
+<span class="c1">// From glfw3.h</span>
+<span class="cp">#define HZ_KEY_SPACE              32</span>
+<span class="cp">#define HZ_KEY_APOSTROPHE         39</span>
+<span class="cp">#define HZ_KEY_COMMA              44</span>
+<span class="cp">#define HZ_KEY_MINUS              45</span>
+<span class="cp">#define HZ_KEY_PERIOD             46</span>
+<span class="cp">#define HZ_KEY_SLASH              47</span>
+
+<span class="cp">#define HZ_KEY_0                  48</span>
+<span class="cp">#define HZ_KEY_1                  49</span>
+<span class="cp">#define HZ_KEY_2                  50</span>
+<span class="cp">#define HZ_KEY_3                  51</span>
+<span class="cp">#define HZ_KEY_4                  52</span>
+<span class="cp">#define HZ_KEY_5                  53</span>
+<span class="cp">#define HZ_KEY_6                  54</span>
+<span class="cp">#define HZ_KEY_7                  55</span>
+<span class="cp">#define HZ_KEY_8                  56</span>
+<span class="cp">#define HZ_KEY_9                  57</span>
+
+<span class="cp">#define HZ_KEY_A                  65</span>
+<span class="cp">#define HZ_KEY_B                  66</span>
+<span class="cp">#define HZ_KEY_C                  67</span>
+<span class="c1">// ...</span>
+</code></pre></div>
+
+<p>完整文件还包括：</p>
+<ul>
+<li>字母、数字和符号键；</li>
+<li>左右 Shift、Ctrl、Alt、Super；</li>
+<li>Escape、Enter、Tab、Backspace；</li>
+<li>方向键、Page、Home、End；</li>
+<li>F1 到 F25；</li>
+<li>小键盘数字与运算键。</li>
+</ul>
+<p>文件中保留了来源注释：</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// From glfw3.h</span>
+</code></pre></div>
+
+<p>这是为了避免以后忘记这些数值的来源。</p>
+<h3 id="21">2.1 为什么不完全重新发明一套数值</h3>
+<p>可以随意指定：</p>
+<div class="highlight"><pre><span></span><code>HZ_KEY_A = 10000
+HZ_KEY_B = 10001
+</code></pre></div>
+
+<p>但这样没有任何直接收益，反而会让当前 GLFW 后端也需要额外转换。</p>
+<p>直接复用 GLFW 的数值，同时使用 Hazel 的名字，可以得到两个结果：</p>
+<ol>
+<li>客户端不再直接依赖 GLFW 常量；</li>
+<li>当前 GLFW 后端因为数值一致，暂时不需要运行时转换。</li>
+</ol>
+<p>这是一种渐进式隔离：先把依赖从公共 API 中移走，再在真正更换后端时补上转换层。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_06_49.png" alt="在 KeyCodes.h 中复制 GLFW 键值并重命名为 HZ_KEY" loading="lazy">
+  <p class="video-caption">📷 在 KeyCodes.h 中复制 GLFW 键值并重命名为 HZ_KEY<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=20&t=409" target="_blank" rel="noopener">回到原视频 (00:06:49)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_07_31.png" alt="将 GLFW_ 前缀统一替换为 HZ_" loading="lazy">
+  <p class="video-caption">📷 将 GLFW_ 前缀统一替换为 HZ_<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=20&t=451" target="_blank" rel="noopener">回到原视频 (00:07:31)</a></p>
+</div>
+
+<h2 id="3-hz_key_super">3. HZ_KEY_SUPER 与键盘语义</h2>
+<p>GLFW 使用 <code>SUPER</code> 表示系统级修饰键：</p>
+<ul>
+<li>Windows 上是 Windows 键；</li>
+<li>macOS 上是 Command 键；</li>
+<li>Linux 桌面环境中通常映射为 Super 键。</li>
+</ul>
+<p>因此不把它改名为 <code>WINDOWS_KEY</code>。Hazel 目标是跨平台，键名也应描述功能而不是某一个操作系统。</p>
+<p>左右修饰键分别保留：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#define HZ_KEY_LEFT_SHIFT         340</span>
+<span class="cp">#define HZ_KEY_LEFT_CONTROL       341</span>
+<span class="cp">#define HZ_KEY_LEFT_ALT           342</span>
+<span class="cp">#define HZ_KEY_LEFT_SUPER         343</span>
+
+<span class="cp">#define HZ_KEY_RIGHT_SHIFT        344</span>
+<span class="cp">#define HZ_KEY_RIGHT_CONTROL      345</span>
+<span class="cp">#define HZ_KEY_RIGHT_ALT          346</span>
+<span class="cp">#define HZ_KEY_RIGHT_SUPER        347</span>
+</code></pre></div>
+
+<h2 id="4-mousebuttoncodesh">4. 创建 MouseButtonCodes.h</h2>
+<p><em>(参考时间: 00:08:24)</em></p>
+<p>鼠标按钮采用同样方式：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#pragma once</span>
+
+<span class="c1">// From glfw3.h</span>
+<span class="cp">#define HZ_MOUSE_BUTTON_1         0</span>
+<span class="cp">#define HZ_MOUSE_BUTTON_2         1</span>
+<span class="cp">#define HZ_MOUSE_BUTTON_3         2</span>
+<span class="cp">#define HZ_MOUSE_BUTTON_4         3</span>
+<span class="cp">#define HZ_MOUSE_BUTTON_5         4</span>
+<span class="cp">#define HZ_MOUSE_BUTTON_6         5</span>
+<span class="cp">#define HZ_MOUSE_BUTTON_7         6</span>
+<span class="cp">#define HZ_MOUSE_BUTTON_8         7</span>
+
+<span class="cp">#define HZ_MOUSE_BUTTON_LAST      HZ_MOUSE_BUTTON_8</span>
+
+<span class="cp">#define HZ_MOUSE_BUTTON_LEFT      HZ_MOUSE_BUTTON_1</span>
+<span class="cp">#define HZ_MOUSE_BUTTON_RIGHT     HZ_MOUSE_BUTTON_2</span>
+<span class="cp">#define HZ_MOUSE_BUTTON_MIDDLE    HZ_MOUSE_BUTTON_3</span>
+</code></pre></div>
+
+<p>这样客户端可以写：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Input</span><span class="o">::</span><span class="n">IsMouseButtonPressed</span><span class="p">(</span>
+<span class="w">    </span><span class="n">HZ_MOUSE_BUTTON_LEFT</span><span class="p">);</span>
+</code></pre></div>
+
+<p>不必知道 GLFW 把左键定义成整数 <code>0</code>。</p>
+<p>GLFW 还有一些 modifier flags，但现代 GLFW 已经不再让用户主动传递这些 flags，因此本讲暂时不复制它们；将来确实需要时再补。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_08_24.png" alt="从 GLFW 鼠标按钮定义建立 HZ_MOUSE_BUTTON 宏" loading="lazy">
+  <p class="video-caption">📷 从 GLFW 鼠标按钮定义建立 HZ_MOUSE_BUTTON 宏<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=20&t=504" target="_blank" rel="noopener">回到原视频 (00:08:24)</a></p>
+</div>
+
+<h2 id="5-hazelh">5. 通过 Hazel.h 暴露给客户端</h2>
+<p><em>(参考时间: 00:09:07)</em></p>
+<p><code>Hazel.h</code> 作为客户端总入口，增加：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"Hazel/Input.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"Hazel/KeyCodes.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"Hazel/MouseButtonCodes.h"</span>
+</code></pre></div>
+
+<p>客户端现在只需要：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;Hazel.h&gt;</span>
+</code></pre></div>
+
+<p>就可以访问 Input API 与 Hazel 键码，不再需要：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;GLFW/glfw3.h&gt;</span>
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>graph TD
+    A[客户端 Sandbox] --&gt; B[Hazel.h]
+    B --&gt; C[Input.h]
+    B --&gt; D[KeyCodes.h]
+    B --&gt; E[MouseButtonCodes.h]
+    C --&gt; F[WindowsInput]
+    F --&gt; G[GLFW]
+</code></pre></div>
+
+<p>注意：GLFW 仍然是被 Hazel 平台层使用的实现依赖，只是不再出现在客户端源码中。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_09_07.png" alt="Hazel.h 统一公开 Input、KeyCodes 和 MouseButtonCodes" loading="lazy">
+  <p class="video-caption">📷 Hazel.h 统一公开 Input、KeyCodes 和 MouseButtonCodes<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=20&t=547" target="_blank" rel="noopener">回到原视频 (00:09:07)</a></p>
+</div>
+
+<h2 id="6-sandbox">6. 在 Sandbox 中验证</h2>
+<p><em>(参考时间: 00:09:45)</em></p>
+<p>ExampleLayer 可以使用 Hazel 键码测试轮询：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">OnUpdate</span><span class="p">()</span><span class="w"> </span><span class="k">override</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">Input</span><span class="o">::</span><span class="n">IsKeyPressed</span><span class="p">(</span><span class="n">HZ_KEY_TAB</span><span class="p">))</span>
+<span class="w">        </span><span class="n">HZ_TRACE</span><span class="p">(</span><span class="s">"Tab key is pressed (poll)!"</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>运行 Sandbox 后，按住 Tab 键就能持续看到 <code>Tab key is pressed (poll)!</code>。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_09_45.png" alt="用 HZ_KEY_TAB 测试输入轮询" loading="lazy">
+  <p class="video-caption">📷 用 HZ_KEY_TAB 测试输入轮询<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=20&t=585" target="_blank" rel="noopener">回到原视频 (00:09:45)</a></p>
+</div>
+
+<h3 id="61-hazel">6.1 在事件系统中也使用 Hazel 键码</h3>
+<p>除了轮询，Hazel 事件也可以直接与 <code>HZ_KEY_*</code> 比较：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">OnEvent</span><span class="p">(</span><span class="n">Event</span><span class="o">&amp;</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="k">override</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="p">.</span><span class="n">GetEventType</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EventType</span><span class="o">::</span><span class="n">KeyPressed</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">KeyPressedEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="o">=</span>
+<span class="w">            </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">KeyPressedEvent</span><span class="o">&amp;&gt;</span><span class="p">(</span><span class="n">event</span><span class="p">);</span>
+
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">e</span><span class="p">.</span><span class="n">GetKeyCode</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">HZ_KEY_TAB</span><span class="p">)</span>
+<span class="w">            </span><span class="n">HZ_TRACE</span><span class="p">(</span><span class="s">"Tab key is pressed (event)!"</span><span class="p">);</span>
+
+<span class="w">        </span><span class="n">HZ_TRACE</span><span class="p">(</span><span class="s">"{0}"</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">char</span><span class="p">)</span><span class="n">e</span><span class="p">.</span><span class="n">GetKeyCode</span><span class="p">());</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这里的 <code>static_cast</code> 比 C 风格强制转换更明确地表达事件类型检查后的向下转换。</p>
+<p>官方提交中使用了 C 风格转换，本段为便于理解改用 <code>static_cast</code>；运行语义相同。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_20_30.png" alt="事件处理函数中用 HZ_KEY_TAB 比较事件键码" loading="lazy">
+  <p class="video-caption">📷 事件处理函数中用 HZ_KEY_TAB 比较事件键码<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=20&t=1230" target="_blank" rel="noopener">回到原视频 (00:20:30)</a></p>
+</div>
+
+<h2 id="7">7. 后端切换时如何转换键码</h2>
+<p><em>(参考时间: 00:10:33)</em></p>
+<p>现在 Hazel 键码与 GLFW 数值相同，所以 GLFW 后端不需要转换。但未来如果 Windows 改用 Win32，就可能需要把 Hazel 键码和 Win32 虚拟键码互相转换。</p>
+<p>主要有两种方案。</p>
+<h3 id="71">7.1 编译时选择平台键值</h3>
+<p>在头文件中根据目标平台定义不同的数值：</p>
+<p>概念示意：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#ifdef HZ_PLATFORM_WINDOWS</span>
+<span class="w">    </span><span class="cp">#define HZ_KEY_TAB 9</span>
+<span class="cp">#else</span>
+<span class="w">    </span><span class="cp">#define HZ_KEY_TAB 258</span>
+<span class="cp">#endif</span>
+</code></pre></div>
+
+<p>优点：</p>
+<ul>
+<li>运行时没有转换成本；</li>
+<li>调用点最简单。</li>
+</ul>
+<p>缺点：</p>
+<ul>
+<li>同一逻辑键在不同平台具有不同数值；</li>
+<li>如果保存按键映射或输入配置，跨平台文件不兼容。</li>
+</ul>
+<p>例如 Windows 上保存 Tab 为 <code>9</code>，把配置文件复制到 macOS 后，macOS 认为 Tab 是 <code>258</code>，原设置无法直接使用。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[HZ_KEY_TAB] --&gt; B{编译平台}
+    B -- Windows --&gt; C[9]
+    B -- macOS/Linux --&gt; D[258]
+    C --&gt; E[保存配置后跨平台不兼容]
+    D --&gt; E
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_12_43.png" alt="编译时平台键码的数值与序列化兼容问题" loading="lazy">
+  <p class="video-caption">📷 编译时平台键码的数值与序列化兼容问题<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=20&t=763" target="_blank" rel="noopener">回到原视频 (00:12:43)</a></p>
+</div>
+
+<h3 id="72">7.2 运行时执行转换</h3>
+<p>让 Hazel 键码始终保持统一定义，当调用具体后端时再转换：</p>
+<div class="highlight"><pre><span></span><code>后端事件 -&gt; GLFW key -&gt; Hazel key
+Hazel key -&gt; GLFW key -&gt; 后端轮询
+</code></pre></div>
+
+<p>例如事件方向需要一个：</p>
+<div class="highlight"><pre><span></span><code><span class="n">GLFWKeyToHZKey</span><span class="p">(</span><span class="n">glfwKey</span><span class="p">)</span>
+</code></pre></div>
+
+<p>轮询方向需要：</p>
+<div class="highlight"><pre><span></span><code><span class="n">HZKeyToGLFWKey</span><span class="p">(</span><span class="n">hzKey</span><span class="p">)</span>
+</code></pre></div>
+
+<p>两者都可以通过查表实现。</p>
+<p>运行时会增加一次查找，但 Cherno 认为这不会成为游戏引擎的性能瓶颈。相比少量查找开销，按键映射的跨平台可移植性更重要。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant B as Backend
+    participant C as Converter
+    participant H as Hazel API
+
+    B-&gt;&gt;C: backend keycode
+    C-&gt;&gt;H: Hazel keycode
+    H-&gt;&gt;C: Hazel keycode
+    C-&gt;&gt;B: backend keycode
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_14_14.png" alt="运行时通过转换表适配不同后端键码" loading="lazy">
+  <p class="video-caption">📷 运行时通过转换表适配不同后端键码<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=20&t=854" target="_blank" rel="noopener">回到原视频 (00:14:14)</a></p>
+</div>
+
+<h3 id="73">7.3 当前选择</h3>
+<p>当前仍使用 GLFW，而 <code>HZ_KEY_*</code> 的数值直接来自 GLFW。因此本讲不需要真正写转换函数：</p>
+<ul>
+<li>WindowsWindow 收到 GLFW 键码时可直接构造事件；</li>
+<li>WindowsInput 收到 Hazel 键码时可直接传给 GLFW。</li>
+</ul>
+<p>未来接入不同后端时，再在平台边界增加转换表即可。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_16_07.png" alt="当前 GLFW 数值一致，所以暂时无需运行时转换" loading="lazy">
+  <p class="video-caption">📷 当前 GLFW 数值一致，所以暂时无需运行时转换<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=20&t=967" target="_blank" rel="noopener">回到原视频 (00:16:07)</a></p>
+</div>
+
+<h2 id="8-ascii">8. 字母键码与 ASCII 的便利</h2>
+<p><em>(参考时间: 00:17:00)</em></p>
+<p>GLFW 的字母键值直接对应 ASCII：</p>
+<div class="highlight"><pre><span></span><code>HZ_KEY_A = 65
+HZ_KEY_B = 66
+...
+</code></pre></div>
+
+<p>这带来一个实际便利：可以把字母键码转换为 <code>char</code> 并直接打印：</p>
+<div class="highlight"><pre><span></span><code><span class="n">HZ_TRACE</span><span class="p">(</span><span class="s">"{0}"</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">char</span><span class="p">)</span><span class="n">e</span><span class="p">.</span><span class="n">GetKeyCode</span><span class="p">());</span>
+</code></pre></div>
+
+<p>按键输入 <code>public</code> 时，日志可以直接看到字符序列：</p>
+<div class="highlight"><pre><span></span><code>p
+u
+b
+l
+i
+c
+</code></pre></div>
+
+<p>非 ASCII 键不会得到有意义字符。例如 Tab 对应的数字转换为 <code>char</code> 并不是可见的英文字符。</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[HZ_KEY_A] --&gt; B[65]
+    B --&gt; C[char 'A']
+    C --&gt; D[可直接打印与调试]
+    E[HZ_KEY_TAB] --&gt; F[258]
+    F --&gt; G[不属于普通 ASCII 可打印字符]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_18_20.png" alt="使用字母键码与 ASCII 对齐的特性直接输出字符" loading="lazy">
+  <p class="video-caption">📷 使用字母键码与 ASCII 对齐的特性直接输出字符<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=20&t=1100" target="_blank" rel="noopener">回到原视频 (00:18:20)</a></p>
+</div>
+
+<h2 id="9">9. 最终效果</h2>
+<p>ExampleLayer 现在同时支持两种输入路径：</p>
+<ul>
+<li><code>Input::IsKeyPressed(HZ_KEY_TAB)</code>：每帧轮询；</li>
+<li><code>e.GetKeyCode() == HZ_KEY_TAB</code>：只在按键事件发生时处理。</li>
+</ul>
+<p>轮询与事件都使用统一的 Hazel 键码，不再需要客户端包含 GLFW。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[客户端代码] --&gt; B[HZ_KEY_TAB]
+    B --&gt; C[Input Polling]
+    B --&gt; D[KeyPressedEvent]
+    C --&gt; E[WindowsInput]
+    D --&gt; F[WindowsWindow Event]
+    E --&gt; G[GLFW 后端]
+    F --&gt; G
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_20_30.png" alt="轮询和事件现在都能使用 Hazel 键码" loading="lazy">
+  <p class="video-caption">📷 轮询和事件现在都能使用 Hazel 键码<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=20&t=1230" target="_blank" rel="noopener">回到原视频 (00:20:30)</a></p>
+</div>
+
+<h2 id="10">10. 本节结论</h2>
+<p>本讲完成了键码与鼠标码的第一层抽象：</p>
+<ul>
+<li>识别出公共 API 直接暴露 GLFW 常量的问题；</li>
+<li>新增 <code>KeyCodes.h</code>；</li>
+<li>新增 <code>MouseButtonCodes.h</code>；</li>
+<li>复制 GLFW 数值并重命名为 <code>HZ_KEY_*</code>、<code>HZ_MOUSE_BUTTON_*</code>；</li>
+<li>在 <code>Hazel.h</code> 中统一公开这些头文件；</li>
+<li>客户端可以直接使用 Hazel 键码进行轮询和事件比较；</li>
+<li>解释了编译时平台键值与运行时转换的取舍；</li>
+<li>确认当前 GLFW 数值一致，因此暂时无需转换；</li>
+<li>利用字母键码与 ASCII 对齐，直接输出输入字符进行验证。</li>
+</ul>
+<p>Hazel 还没有完全摆脱 GLFW，但客户端 API 已经不再要求用户了解 GLFW。这是一种重要的边界调整：平台实现可以继续使用第三方库，公共接口则保持稳定、统一和可迁移。</p>
+<h2 id="_2">附：参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=20">Bilibili 精译视频：020 - 键盘和鼠标代码</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/tree/6a5e6887">本期对应代码提交 <code>6a5e6887</code></a></li>
+<li><a href="https://www.glfw.org/docs/latest/input_guide.html">GLFW Input Guide</a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>
