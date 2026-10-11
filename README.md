@@ -28,3 +28,11 @@
   - [Markdown 版本](<Hazel Game Engine/016 - ImGui Events/book.md>)
   - 视频来源：[Bilibili 精译版第 16 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=16)
   - 主题：`EventDispatcher` 路由、鼠标与窗口缩放、键盘修饰键、`KeyTypedEvent` 和 GLFW 字符输入
+
+## 南京大学操作系统原理 2026
+
+- [029 - 虚拟机和容器](<南京大学操作系统原理/029 - 虚拟机和容器/book.html>)
+  - [Markdown 版本](<南京大学操作系统原理/029 - 虚拟机和容器/book.md>)
+  - 视频来源：[Bilibili BV1uaEB66EAH](https://www.bilibili.com/video/BV1uaEB66EAH/)
+  - 官方讲义：[第 29 讲](https://jyywiki.cn/OS/2026/lect29.md)
+  - 主题：全系统模拟、JIT 动态翻译、Disco/VMware、影子页表、命名空间、`pidfd`、cgroups、容器与 Kubernetes
