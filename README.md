@@ -24,3 +24,7 @@
   - [Markdown 版本](<Hazel Game Engine/015 - ImGui/book.md>)
   - 视频来源：[Bilibili 精译版第 15 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=15)
   - 主题：ImGui 子模块与 Premake、`ImGuiLayer`、OpenGL3 示例渲染器、每帧绘制流程、Application 单例和 Layer 生命周期修复
+- [016 - ImGui 事件](<Hazel Game Engine/016 - ImGui Events/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/016 - ImGui Events/book.md>)
+  - 视频来源：[Bilibili 精译版第 16 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=16)
+  - 主题：`EventDispatcher` 路由、鼠标与窗口缩放、键盘修饰键、`KeyTypedEvent` 和 GLFW 字符输入

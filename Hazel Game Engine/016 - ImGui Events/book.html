@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 016：把 ImGui 接入 Hazel 事件系统</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: #f3f4f6; font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+            code { overflow-wrap: anywhere; word-break: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-016-imgui-hazel">Hazel 游戏引擎笔记 016：把 ImGui 接入 Hazel 事件系统</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16">The Cherno 游戏引擎系列第 16 讲“ImGui 事件”</a>，时长约 23 分 02 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。代码参考提交：<a href="https://github.com/TheCherno/Hazel/tree/709b40de15b6c46db7746c7feb4b2dd98397df99"><code>709b40de</code></a>。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材；术语和代码以原视频及同期 Hazel 仓库为准。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>上一讲已经能让 Dear ImGui 在 Hazel 窗口中显示 Demo Window，但它只能看、不能操作。本讲把 Hazel 的事件系统接进 <code>ImGuiLayer</code>，让鼠标、键盘和窗口缩放真正驱动 ImGui。</p>
+<p>完成后的能力包括：</p>
+<ul>
+<li>鼠标移动、点击、拖拽和滚轮；</li>
+<li>移动、折叠 ImGui 窗口并操作控件；</li>
+<li>键盘按键按下与释放状态；</li>
+<li>Ctrl、Shift、Alt、Super 修饰键；</li>
+<li>向 ImGui 文本框输入字符；</li>
+<li>窗口缩放后保持正确的显示尺寸和 OpenGL viewport。</li>
+</ul>
+<p>整条链路可以概括为：</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[GLFW 原生回调] --&gt; B[WindowsWindow]
+    B --&gt; C[Hazel Event]
+    C --&gt; D[Application::OnEvent]
+    D --&gt; E[LayerStack 反向传播]
+    E --&gt; F[ImGuiLayer::OnEvent]
+    F --&gt; G[EventDispatcher]
+    G --&gt; H[具体 OnXxxEvent]
+    H --&gt; I[更新 ImGuiIO]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_02_55.png" alt="上一讲只能显示、无法交互的 ImGui Demo Window" loading="lazy">
+  <p class="video-caption">📷 上一讲只能显示、无法交互的 ImGui Demo Window<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16&t=175" target="_blank" rel="noopener">回到原视频 (00:02:55)</a></p>
+</div>
+
+<h2 id="1-imgui-glfw">1. 从 ImGui 的 GLFW 后端借鉴实现</h2>
+<p><em>(参考时间: 00:03:02)</em></p>
+<p>最直接的参考对象是 Dear ImGui 自带的 <code>imgui_impl_glfw.cpp</code>。其中已经处理了 GLFW 的回调，并把输入状态写入 <code>ImGuiIO</code>：</p>
+<ul>
+<li>Key callback 更新按键状态；</li>
+<li>Scroll callback 更新滚轮；</li>
+<li>Mouse button callback 更新鼠标按钮；</li>
+<li>Cursor position callback 更新鼠标位置；</li>
+<li>Char callback 提供实际输入的字符。</li>
+</ul>
+<p>例如，键盘回调会执行类似逻辑：</p>
+<div class="highlight"><pre><span></span><code><span class="n">io</span><span class="p">.</span><span class="n">KeysDown</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+</code></pre></div>
+
+<p>这里的 <code>key</code> 并不是直接作为 ImGui 内部数组下标使用，而是与上一讲配置的 <code>io.KeyMap</code> 对应。Hazel 本讲不会照搬整个后端，而是参考它的数据流，用 Hazel 自己的 <code>Event</code> 和 <code>EventDispatcher</code> 重新实现。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_03_18.png" alt="参考 imgui_impl_glfw 的键回调与 ImGuiIO 更新" loading="lazy">
+  <p class="video-caption">📷 参考 imgui_impl_glfw 的键回调与 ImGuiIO 更新<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16&t=198" target="_blank" rel="noopener">回到原视频 (00:03:18)</a></p>
+</div>
+
+<h2 id="2-imguilayer">2. 在 ImGuiLayer 中声明事件处理函数</h2>
+<p><em>(参考时间: 00:04:21)</em></p>
+<p><code>ImGuiLayer</code> 需要处理几乎所有常见输入事件。头文件先包含三类 Hazel 事件：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"Hazel/Events/ApplicationEvent.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"Hazel/Events/KeyEvent.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"Hazel/Events/MouseEvent.h"</span>
+</code></pre></div>
+
+<p>然后为每类事件声明一个私有处理函数。处理函数返回 <code>bool</code>，表示该事件是否已经被消费：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">ImGuiLayer</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">Layer</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">ImGuiLayer</span><span class="p">();</span>
+<span class="w">    </span><span class="o">~</span><span class="n">ImGuiLayer</span><span class="p">();</span>
+
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">OnAttach</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">OnDetach</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">OnUpdate</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">OnEvent</span><span class="p">(</span><span class="n">Event</span><span class="o">&amp;</span><span class="w"> </span><span class="n">event</span><span class="p">);</span>
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">OnMouseButtonPressedEvent</span><span class="p">(</span>
+<span class="w">        </span><span class="n">MouseButtonPressedEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="nf">OnMouseButtonReleasedEvent</span><span class="p">(</span>
+<span class="w">        </span><span class="n">MouseButtonReleasedEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="nf">OnMouseMovedEvent</span><span class="p">(</span><span class="n">MouseMovedEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="nf">OnMouseScrolledEvent</span><span class="p">(</span><span class="n">MouseScrolledEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="nf">OnKeyPressedEvent</span><span class="p">(</span><span class="n">KeyPressedEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="nf">OnKeyReleasedEvent</span><span class="p">(</span><span class="n">KeyReleasedEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="nf">OnKeyTypedEvent</span><span class="p">(</span><span class="n">KeyTypedEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="nf">OnWindowResizeEvent</span><span class="p">(</span><span class="n">WindowResizeEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">);</span>
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">m_Time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>事件处理的职责非常明确：把 Hazel 事件中的数据翻译成 ImGui 需要维护的状态。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_04_25.png" alt="在 ImGuiLayer.h 中声明鼠标、键盘和窗口事件处理函数" loading="lazy">
+  <p class="video-caption">📷 在 ImGuiLayer.h 中声明鼠标、键盘和窗口事件处理函数<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16&t=265" target="_blank" rel="noopener">回到原视频 (00:04:25)</a></p>
+</div>
+
+<h2 id="3-eventdispatcher">3. 用 EventDispatcher 分发事件</h2>
+<p><em>(参考时间: 00:07:09)</em></p>
+<p><code>ImGuiLayer::OnEvent()</code> 只负责判断事件类型，然后把事件转交给对应函数。判断工作交给 <code>EventDispatcher</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">ImGuiLayer::OnEvent</span><span class="p">(</span><span class="n">Event</span><span class="o">&amp;</span><span class="w"> </span><span class="n">event</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">EventDispatcher</span><span class="w"> </span><span class="n">dispatcher</span><span class="p">(</span><span class="n">event</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">dispatcher</span><span class="p">.</span><span class="n">Dispatch</span><span class="o">&lt;</span><span class="n">MouseButtonPressedEvent</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">        </span><span class="n">HZ_BIND_EVENT_FN</span><span class="p">(</span>
+<span class="w">            </span><span class="n">ImGuiLayer</span><span class="o">::</span><span class="n">OnMouseButtonPressedEvent</span><span class="p">));</span>
+<span class="w">    </span><span class="n">dispatcher</span><span class="p">.</span><span class="n">Dispatch</span><span class="o">&lt;</span><span class="n">MouseButtonReleasedEvent</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">        </span><span class="n">HZ_BIND_EVENT_FN</span><span class="p">(</span>
+<span class="w">            </span><span class="n">ImGuiLayer</span><span class="o">::</span><span class="n">OnMouseButtonReleasedEvent</span><span class="p">));</span>
+<span class="w">    </span><span class="n">dispatcher</span><span class="p">.</span><span class="n">Dispatch</span><span class="o">&lt;</span><span class="n">MouseMovedEvent</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">        </span><span class="n">HZ_BIND_EVENT_FN</span><span class="p">(</span><span class="n">ImGuiLayer</span><span class="o">::</span><span class="n">OnMouseMovedEvent</span><span class="p">));</span>
+<span class="w">    </span><span class="n">dispatcher</span><span class="p">.</span><span class="n">Dispatch</span><span class="o">&lt;</span><span class="n">MouseScrolledEvent</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">        </span><span class="n">HZ_BIND_EVENT_FN</span><span class="p">(</span><span class="n">ImGuiLayer</span><span class="o">::</span><span class="n">OnMouseScrolledEvent</span><span class="p">));</span>
+<span class="w">    </span><span class="n">dispatcher</span><span class="p">.</span><span class="n">Dispatch</span><span class="o">&lt;</span><span class="n">KeyPressedEvent</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">        </span><span class="n">HZ_BIND_EVENT_FN</span><span class="p">(</span><span class="n">ImGuiLayer</span><span class="o">::</span><span class="n">OnKeyPressedEvent</span><span class="p">));</span>
+<span class="w">    </span><span class="n">dispatcher</span><span class="p">.</span><span class="n">Dispatch</span><span class="o">&lt;</span><span class="n">KeyTypedEvent</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">        </span><span class="n">HZ_BIND_EVENT_FN</span><span class="p">(</span><span class="n">ImGuiLayer</span><span class="o">::</span><span class="n">OnKeyTypedEvent</span><span class="p">));</span>
+<span class="w">    </span><span class="n">dispatcher</span><span class="p">.</span><span class="n">Dispatch</span><span class="o">&lt;</span><span class="n">KeyReleasedEvent</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">        </span><span class="n">HZ_BIND_EVENT_FN</span><span class="p">(</span><span class="n">ImGuiLayer</span><span class="o">::</span><span class="n">OnKeyReleasedEvent</span><span class="p">));</span>
+<span class="w">    </span><span class="n">dispatcher</span><span class="p">.</span><span class="n">Dispatch</span><span class="o">&lt;</span><span class="n">WindowResizeEvent</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">        </span><span class="n">HZ_BIND_EVENT_FN</span><span class="p">(</span><span class="n">ImGuiLayer</span><span class="o">::</span><span class="n">OnWindowResizeEvent</span><span class="p">));</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="31">3.1 减少回调绑定样板代码</h3>
+<p>成员函数需要绑定当前 <code>ImGuiLayer</code> 实例，再保留一个事件参数占位符。直接写 <code>std::bind</code> 会非常冗长，因此在 <code>Core.h</code> 中增加宏：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#define HZ_BIND_EVENT_FN(fn) \</span>
+<span class="cp">    std::bind(&amp;fn, this, std::placeholders::_1)</span>
+</code></pre></div>
+
+<p>于是 <code>HZ_BIND_EVENT_FN(ImGuiLayer::OnMouseMovedEvent)</code> 会生成一个可交给 <code>EventDispatcher</code> 调用的函数对象。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant W as WindowsWindow
+    participant A as Application
+    participant L as ImGuiLayer
+    participant D as EventDispatcher
+    participant F as OnXxxEvent
+    participant IO as ImGuiIO
+
+    W-&gt;&gt;A: EventCallback(event)
+    A-&gt;&gt;L: OnEvent(event)
+    L-&gt;&gt;D: Dispatch&lt;T&gt;(handler)
+    D-&gt;&gt;D: 比较 event type
+    D-&gt;&gt;F: 类型匹配时调用
+    F-&gt;&gt;IO: 更新输入或显示状态
+    F--&gt;&gt;D: return false
+    D--&gt;&gt;L: event.Handled 保持 false
+</code></pre></div>
+
+<p>多个处理函数返回 <code>false</code>，表示 ImGuiLayer 更新了 ImGui 状态，但不独占事件。这样事件仍能继续传给其它 Layer。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_07_09.png" alt="在 ImGuiLayer 的 OnEvent 中集中分发事件" loading="lazy">
+  <p class="video-caption">📷 在 ImGuiLayer 的 OnEvent 中集中分发事件<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16&t=429" target="_blank" rel="noopener">回到原视频 (00:07:09)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_08_52.png" alt="把 std::bind 封装为 HZ_BIND_EVENT_FN 宏" loading="lazy">
+  <p class="video-caption">📷 把 std::bind 封装为 HZ_BIND_EVENT_FN 宏<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16&t=532" target="_blank" rel="noopener">回到原视频 (00:08:52)</a></p>
+</div>
+
+<h2 id="4">4. 接入鼠标事件</h2>
+<p><em>(参考时间: 00:10:03)</em></p>
+<p>鼠标事件是验证整条链路最直接的一组输入。</p>
+<h3 id="41">4.1 鼠标按钮</h3>
+<p>按下时把对应按钮设为 <code>true</code>，释放时设为 <code>false</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">ImGuiLayer::OnMouseButtonPressedEvent</span><span class="p">(</span>
+<span class="w">    </span><span class="n">MouseButtonPressedEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">ImGuiIO</span><span class="o">&amp;</span><span class="w"> </span><span class="n">io</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImGui</span><span class="o">::</span><span class="n">GetIO</span><span class="p">();</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">MouseDown</span><span class="p">[</span><span class="n">e</span><span class="p">.</span><span class="n">GetMouseButton</span><span class="p">()]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">bool</span><span class="w"> </span><span class="nf">ImGuiLayer::OnMouseButtonReleasedEvent</span><span class="p">(</span>
+<span class="w">    </span><span class="n">MouseButtonReleasedEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">ImGuiIO</span><span class="o">&amp;</span><span class="w"> </span><span class="n">io</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImGui</span><span class="o">::</span><span class="n">GetIO</span><span class="p">();</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">MouseDown</span><span class="p">[</span><span class="n">e</span><span class="p">.</span><span class="n">GetMouseButton</span><span class="p">()]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>虽然 ImGui 已经能收到按钮状态，但当前无法判断鼠标是否真的落在某个 ImGui 控件上，因此仍然返回 <code>false</code>。这样其它 Layer 也有机会处理同一次点击，而不是所有鼠标事件都被 ImGuiLayer 吃掉。</p>
+<h3 id="42">4.2 鼠标移动</h3>
+<div class="highlight"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">ImGuiLayer::OnMouseMovedEvent</span><span class="p">(</span><span class="n">MouseMovedEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">ImGuiIO</span><span class="o">&amp;</span><span class="w"> </span><span class="n">io</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImGui</span><span class="o">::</span><span class="n">GetIO</span><span class="p">();</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">MousePos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImVec2</span><span class="p">(</span><span class="n">e</span><span class="p">.</span><span class="n">GetX</span><span class="p">(),</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">GetY</span><span class="p">());</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="43">4.3 滚轮</h3>
+<p>Hazel 的 <code>MouseScrolledEvent</code> 分别提供水平与垂直偏移：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">ImGuiLayer::OnMouseScrolledEvent</span><span class="p">(</span>
+<span class="w">    </span><span class="n">MouseScrolledEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">ImGuiIO</span><span class="o">&amp;</span><span class="w"> </span><span class="n">io</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImGui</span><span class="o">::</span><span class="n">GetIO</span><span class="p">();</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">MouseWheelH</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">GetXOffset</span><span class="p">();</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">MouseWheel</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">GetYOffset</span><span class="p">();</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这里使用累加而不是直接赋值，因为一帧中可能收到多次滚轮事件。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[GLFW 鼠标回调] --&gt; B{事件类型}
+    B -- Button --&gt; C[io.MouseDown]
+    B -- CursorPos --&gt; D[io.MousePos]
+    B -- Scroll --&gt; E[io.MouseWheelH / MouseWheel]
+    C --&gt; F[返回 false]
+    D --&gt; F
+    E --&gt; F
+    F --&gt; G[事件继续向其它 Layer 传播]
+</code></pre></div>
+
+<p>完成鼠标部分后，已经可以移动 ImGui 窗口、展开节点并对控件点击和拖拽。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_11_26.png" alt="鼠标移动、点击与滚轮状态写入 ImGuiIO" loading="lazy">
+  <p class="video-caption">📷 鼠标移动、点击与滚轮状态写入 ImGuiIO<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16&t=686" target="_blank" rel="noopener">回到原视频 (00:11:26)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_12_52.png" alt="接入鼠标事件后可以拖动和操作 ImGui 窗口" loading="lazy">
+  <p class="video-caption">📷 接入鼠标事件后可以拖动和操作 ImGui 窗口<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16&t=772" target="_blank" rel="noopener">回到原视频 (00:12:52)</a></p>
+</div>
+
+<h2 id="5">5. 处理窗口缩放</h2>
+<p><em>(参考时间: 00:13:10)</em></p>
+<p>窗口尺寸变化不仅影响布局，也影响 ImGui 的显示区域和 OpenGL 的实际渲染范围。</p>
+<p>第一次编译时提示找不到 <code>WindowResizeEvent</code>，因为 ImGuiLayer 还没有包含 <code>ApplicationEvent.h</code>。补上头文件后实现：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">ImGuiLayer::OnWindowResizeEvent</span><span class="p">(</span>
+<span class="w">    </span><span class="n">WindowResizeEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">ImGuiIO</span><span class="o">&amp;</span><span class="w"> </span><span class="n">io</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImGui</span><span class="o">::</span><span class="n">GetIO</span><span class="p">();</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">DisplaySize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImVec2</span><span class="p">(</span><span class="n">e</span><span class="p">.</span><span class="n">GetWidth</span><span class="p">(),</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">GetHeight</span><span class="p">());</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">DisplayFramebufferScale</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImVec2</span><span class="p">(</span><span class="mf">1.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0f</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">glViewport</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">GetWidth</span><span class="p">(),</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">GetHeight</span><span class="p">());</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>三个更新分别解决：</p>
+<ul>
+<li><code>DisplaySize</code>：告诉 ImGui 新的逻辑窗口尺寸；</li>
+<li><code>DisplayFramebufferScale</code>：暂时固定为 <code>1:1</code>，本讲不处理高 DPI；</li>
+<li><code>glViewport</code>：把 OpenGL 输出映射到新的窗口区域。</li>
+</ul>
+<p><code>glViewport</code> 需要 Glad：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;glad/glad.h&gt;</span>
+</code></pre></div>
+
+<p>这里直接修改 OpenGL viewport 是明确的临时方案，因为 Hazel 还没有自己的 Renderer。当前它能让缩放立即生效，但未来应由渲染抽象统一管理。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[WindowResizeEvent] --&gt; B[更新 io.DisplaySize]
+    A --&gt; C[设置 DisplayFramebufferScale = 1:1]
+    A --&gt; D[glViewport 更新 OpenGL 区域]
+    B --&gt; E[ImGui 使用新布局尺寸]
+    D --&gt; F[新窗口区域正常渲染]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_13_24.png" alt="窗口缩放事件更新 DisplaySize、framebuffer scale 和 viewport" loading="lazy">
+  <p class="video-caption">📷 窗口缩放事件更新 DisplaySize、framebuffer scale 和 viewport<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16&t=804" target="_blank" rel="noopener">回到原视频 (00:13:24)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_14_34.png" alt="缩放后 ImGui 能绘制到新增的窗口区域" loading="lazy">
+  <p class="video-caption">📷 缩放后 ImGui 能绘制到新增的窗口区域<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16&t=874" target="_blank" rel="noopener">回到原视频 (00:14:34)</a></p>
+</div>
+
+<h2 id="6">6. 接入键盘状态与修饰键</h2>
+<p><em>(参考时间: 00:14:45)</em></p>
+<p>键盘按下与释放首先更新 ImGui 的按键数组：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">ImGuiLayer::OnKeyPressedEvent</span><span class="p">(</span><span class="n">KeyPressedEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">ImGuiIO</span><span class="o">&amp;</span><span class="w"> </span><span class="n">io</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImGui</span><span class="o">::</span><span class="n">GetIO</span><span class="p">();</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">KeysDown</span><span class="p">[</span><span class="n">e</span><span class="p">.</span><span class="n">GetKeyCode</span><span class="p">()]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// 随后更新修饰键</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">bool</span><span class="w"> </span><span class="nf">ImGuiLayer::OnKeyReleasedEvent</span><span class="p">(</span><span class="n">KeyReleasedEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">ImGuiIO</span><span class="o">&amp;</span><span class="w"> </span><span class="n">io</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImGui</span><span class="o">::</span><span class="n">GetIO</span><span class="p">();</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">KeysDown</span><span class="p">[</span><span class="n">e</span><span class="p">.</span><span class="n">GetKeyCode</span><span class="p">()]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="61">6.1 修饰键</h3>
+<p>ImGui 不直接依赖左右 Ctrl 或左右 Shift，而是使用统一的修饰键状态。<code>OnKeyPressedEvent()</code> 在更新按键数组后重新计算：</p>
+<div class="highlight"><pre><span></span><code><span class="n">io</span><span class="p">.</span><span class="n">KeyCtrl</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">KeysDown</span><span class="p">[</span><span class="n">GLFW_KEY_LEFT_CONTROL</span><span class="p">]</span><span class="w"> </span><span class="o">||</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">KeysDown</span><span class="p">[</span><span class="n">GLFW_KEY_RIGHT_CONTROL</span><span class="p">];</span>
+
+<span class="n">io</span><span class="p">.</span><span class="n">KeyShift</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">KeysDown</span><span class="p">[</span><span class="n">GLFW_KEY_LEFT_SHIFT</span><span class="p">]</span><span class="w"> </span><span class="o">||</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">KeysDown</span><span class="p">[</span><span class="n">GLFW_KEY_RIGHT_SHIFT</span><span class="p">];</span>
+
+<span class="n">io</span><span class="p">.</span><span class="n">KeyAlt</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">KeysDown</span><span class="p">[</span><span class="n">GLFW_KEY_LEFT_ALT</span><span class="p">]</span><span class="w"> </span><span class="o">||</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">KeysDown</span><span class="p">[</span><span class="n">GLFW_KEY_RIGHT_ALT</span><span class="p">];</span>
+
+<span class="n">io</span><span class="p">.</span><span class="n">KeySuper</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">KeysDown</span><span class="p">[</span><span class="n">GLFW_KEY_LEFT_SUPER</span><span class="p">]</span><span class="w"> </span><span class="o">||</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">KeysDown</span><span class="p">[</span><span class="n">GLFW_KEY_RIGHT_SUPER</span><span class="p">];</span>
+</code></pre></div>
+
+<p>只要左右任意一侧按下，统一状态就为真。Super 对应 Windows 键或 macOS 的 Command 键，使用平台无关的命名。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[KeyPressedEvent] --&gt; B["io.KeysDown[key] = true"]
+    B --&gt; C{检查左右 Ctrl}
+    C --&gt; D[io.KeyCtrl]
+    B --&gt; E{检查左右 Shift}
+    E --&gt; F[io.KeyShift]
+    B --&gt; G{检查左右 Alt}
+    G --&gt; H[io.KeyAlt]
+    B --&gt; I{检查左右 Super}
+    I --&gt; J[io.KeySuper]
+</code></pre></div>
+
+<p>编者说明：该官方提交只在 <code>OnKeyPressedEvent()</code> 中重算修饰键，<code>OnKeyReleasedEvent()</code> 只把具体键设为 <code>false</code>。因此释放 Ctrl、Shift、Alt 或 Super 时，对应统一状态要等下一次按键事件才会刷新。这个细节与后续替换 Hazel 键码、完善输入系统的工作直接相关。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_14_55.png" alt="键按下和释放状态写入 io.KeysDown" loading="lazy">
+  <p class="video-caption">📷 键按下和释放状态写入 io.KeysDown<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16&t=895" target="_blank" rel="noopener">回到原视频 (00:14:55)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_15_08.png" alt="根据左右 GLFW 键码更新 Ctrl、Shift、Alt 和 Super" loading="lazy">
+  <p class="video-caption">📷 根据左右 GLFW 键码更新 Ctrl、Shift、Alt 和 Super<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16&t=908" target="_blank" rel="noopener">回到原视频 (00:15:08)</a></p>
+</div>
+
+<h2 id="7-keytypedevent">7. 新增 KeyTypedEvent</h2>
+<p><em>(参考时间: 00:16:26)</em></p>
+<p>普通键盘事件传递的是物理键码，但文本框需要的是用户实际输入的字符。例如 Shift 与 <code>1</code> 可能产生 <code>!</code>，而不同键盘布局也可能生成不同字符。</p>
+<p>ImGui 的 GLFW 后端使用 <code>glfwSetCharCallback</code> 处理这一层。Hazel 目前没有对应的“字符输入”事件，因此需要新增 <code>KeyTypedEvent</code>。</p>
+<h3 id="71">7.1 扩展事件类型</h3>
+<p>在 <code>Event.h</code> 的 <code>EventType</code> 中加入：</p>
+<div class="highlight"><pre><span></span><code><span class="k">enum</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">EventType</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">None</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="n">WindowClose</span><span class="p">,</span><span class="w"> </span><span class="n">WindowResize</span><span class="p">,</span><span class="w"> </span><span class="n">WindowFocus</span><span class="p">,</span>
+<span class="w">    </span><span class="n">WindowLostFocus</span><span class="p">,</span><span class="w"> </span><span class="n">WindowMoved</span><span class="p">,</span>
+<span class="w">    </span><span class="n">AppTick</span><span class="p">,</span><span class="w"> </span><span class="n">AppUpdate</span><span class="p">,</span><span class="w"> </span><span class="n">AppRender</span><span class="p">,</span>
+<span class="w">    </span><span class="n">KeyPressed</span><span class="p">,</span><span class="w"> </span><span class="n">KeyReleased</span><span class="p">,</span><span class="w"> </span><span class="n">KeyTyped</span><span class="p">,</span>
+<span class="w">    </span><span class="n">MouseButtonPressed</span><span class="p">,</span><span class="w"> </span><span class="n">MouseButtonReleased</span><span class="p">,</span>
+<span class="w">    </span><span class="n">MouseMoved</span><span class="p">,</span><span class="w"> </span><span class="n">MouseScrolled</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<h3 id="72-keytypedevent">7.2 定义 KeyTypedEvent</h3>
+<p><code>KeyTypedEvent</code> 复用 <code>KeyEvent</code> 的键码字段，但不再保存重复次数：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">KeyTypedEvent</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">KeyEvent</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">KeyTypedEvent</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">keycode</span><span class="p">)</span>
+<span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="n">KeyEvent</span><span class="p">(</span><span class="n">keycode</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">ToString</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">stringstream</span><span class="w"> </span><span class="n">ss</span><span class="p">;</span>
+<span class="w">        </span><span class="n">ss</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"KeyTypedEvent: "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">m_KeyCode</span><span class="p">;</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">ss</span><span class="p">.</span><span class="n">str</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">EVENT_CLASS_TYPE</span><span class="p">(</span><span class="n">KeyTyped</span><span class="p">)</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_17_17.png" alt="在 KeyEvent.h 中新增 KeyTypedEvent" loading="lazy">
+  <p class="video-caption">📷 在 KeyEvent.h 中新增 KeyTypedEvent<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16&t=1037" target="_blank" rel="noopener">回到原视频 (00:17:17)</a></p>
+</div>
+
+<h3 id="73-glfw">7.3 从 GLFW 捕获字符</h3>
+<p><code>WindowsWindow</code> 除了设置 key callback，还增加 GLFW char callback：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glfwSetCharCallback</span><span class="p">(</span>
+<span class="w">    </span><span class="n">m_Window</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[](</span><span class="n">GLFWwindow</span><span class="o">*</span><span class="w"> </span><span class="n">window</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">keycode</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">WindowData</span><span class="o">&amp;</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span>
+<span class="w">            </span><span class="o">*</span><span class="p">(</span><span class="n">WindowData</span><span class="o">*</span><span class="p">)</span><span class="n">glfwGetWindowUserPointer</span><span class="p">(</span><span class="n">window</span><span class="p">);</span>
+
+<span class="w">        </span><span class="n">KeyTypedEvent</span><span class="w"> </span><span class="nf">event</span><span class="p">(</span><span class="n">keycode</span><span class="p">);</span>
+<span class="w">        </span><span class="n">data</span><span class="p">.</span><span class="n">EventCallback</span><span class="p">(</span><span class="n">event</span><span class="p">);</span>
+<span class="w">    </span><span class="p">});</span>
+</code></pre></div>
+
+<p>参数是无符号整数形式的 Unicode 字符码。</p>
+<h3 id="74-imgui">7.4 把字符交给 ImGui</h3>
+<div class="highlight"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">ImGuiLayer::OnKeyTypedEvent</span><span class="p">(</span><span class="n">KeyTypedEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">ImGuiIO</span><span class="o">&amp;</span><span class="w"> </span><span class="n">io</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImGui</span><span class="o">::</span><span class="n">GetIO</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">keycode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">GetKeyCode</span><span class="p">();</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">keycode</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">keycode</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mh">0x10000</span><span class="p">)</span>
+<span class="w">        </span><span class="n">io</span><span class="p">.</span><span class="n">AddInputCharacter</span><span class="p">((</span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">short</span><span class="p">)</span><span class="n">keycode</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><code>AddInputCharacter()</code> 接收 <code>unsigned short</code>，因此先检查字符码是否落在有效范围内，再安全转换。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant GLFW as GLFW char callback
+    participant W as WindowsWindow
+    participant A as Application
+    participant L as ImGuiLayer
+    participant IO as ImGuiIO
+
+    GLFW-&gt;&gt;W: Unicode code point
+    W-&gt;&gt;A: KeyTypedEvent
+    A-&gt;&gt;L: OnEvent
+    L-&gt;&gt;L: 检查 0 &lt; code &lt; 0x10000
+    L-&gt;&gt;IO: AddInputCharacter(code)
+    IO--&gt;&gt;L: 字符进入输入队列
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_18_16.png" alt="增加 GLFW char callback 并派发 KeyTypedEvent" loading="lazy">
+  <p class="video-caption">📷 增加 GLFW char callback 并派发 KeyTypedEvent<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16&t=1096" target="_blank" rel="noopener">回到原视频 (00:18:16)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_19_03.png" alt="OnKeyTypedEvent 调用 AddInputCharacter" loading="lazy">
+  <p class="video-caption">📷 OnKeyTypedEvent 调用 AddInputCharacter<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16&t=1143" target="_blank" rel="noopener">回到原视频 (00:19:03)</a></p>
+</div>
+
+<h2 id="8">8. 完整交互测试</h2>
+<p><em>(参考时间: 00:19:47)</em></p>
+<p>完成以上事件后，ImGui Demo Window 已经可以通过 Hazel 的事件系统完整接受常用输入：</p>
+<table>
+<thead>
+<tr>
+<th>输入</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>鼠标移动</td>
+<td>悬停与光标定位</td>
+</tr>
+<tr>
+<td>鼠标点击、拖拽</td>
+<td>按钮、节点、窗口移动</td>
+</tr>
+<tr>
+<td>滚轮</td>
+<td>列表和面板滚动</td>
+</tr>
+<tr>
+<td>普通键</td>
+<td>按键状态</td>
+</tr>
+<tr>
+<td>字符输入</td>
+<td>文本框字符</td>
+</tr>
+<tr>
+<td>Ctrl / Shift / Alt / Super</td>
+<td>修饰键状态</td>
+</tr>
+<tr>
+<td>窗口缩放</td>
+<td>DisplaySize 与 viewport 同步</td>
+</tr>
+</tbody>
+</table>
+<p>测试中可以打开 ImGui 的 Log 面板，在过滤框里输入 <code>hello</code>、数值或组合键操作，也能用 Ctrl+A 选中文本。</p>
+<p>复制粘贴当时还不可用，因为 ImGui 的剪贴板回调尚未接入；视频把它留给读者作为练习。</p>
+<p>Demo Window 的位置和尺寸也会保存到 <code>Sandbox/imgui.ini</code>，下次启动时可以恢复。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_20_05.png" alt="在 ImGui Log 面板中输入文本并使用组合键" loading="lazy">
+  <p class="video-caption">📷 在 ImGui Log 面板中输入文本并使用组合键<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16&t=1205" target="_blank" rel="noopener">回到原视频 (00:20:05)</a></p>
+</div>
+
+<h2 id="9">9. 当前实现的技术债</h2>
+<p><em>(参考时间: 00:20:34)</em></p>
+<p>本讲让事件系统真正可用，但仍保留三处明显债务。</p>
+<h3 id="91-glviewport">9.1 直接调用 glViewport</h3>
+<p>窗口缩放处理直接依赖 Glad 和 OpenGL：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glViewport</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">GetWidth</span><span class="p">(),</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">GetHeight</span><span class="p">());</span>
+</code></pre></div>
+
+<p>这是本讲最明显的临时耦合。未来 Hazel 有 Renderer 后，应通过渲染 API 设置 viewport。</p>
+<h3 id="92-glfw">9.2 仍使用 GLFW 键码</h3>
+<p>修饰键判断直接使用：</p>
+<div class="highlight"><pre><span></span><code><span class="n">GLFW_KEY_LEFT_CONTROL</span>
+<span class="n">GLFW_KEY_RIGHT_CONTROL</span>
+</code></pre></div>
+
+<p>ImGuiLayer 仍然知道 GLFW 的具体键码。下一步应建立 Hazel 自己的键盘与鼠标编码，再由平台层完成转换。</p>
+<h3 id="93">9.3 只有事件，没有输入轮询</h3>
+<p>目前可以在输入发生时收到事件，但不能询问：</p>
+<div class="highlight"><pre><span></span><code>Ctrl 现在是否按下？
+鼠标左键现在是否按下？
+</code></pre></div>
+
+<p>客户端若只依赖事件，就必须自己维护所有键和鼠标按钮的当前状态。更好的设计是让 Hazel 内部保存状态，并提供统一的输入轮询 API。</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[当前：事件驱动] --&gt; B[Hazel 内部维护状态]
+    B --&gt; C[未来：查询 Input::IsKeyPressed]
+    A --&gt; D[GLFW 键码]
+    D --&gt; C
+</code></pre></div>
+
+<p>下一阶段预计会先处理 Hazel 键码与鼠标码，再继续实现输入轮询。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_21_56.png" alt="当前剩余问题：GL viewport、GLFW 键码与输入轮询" loading="lazy">
+  <p class="video-caption">📷 当前剩余问题：GL viewport、GLFW 键码与输入轮询<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16&t=1316" target="_blank" rel="noopener">回到原视频 (00:21:56)</a></p>
+</div>
+
+<h2 id="10">10. 本节结论</h2>
+<p>本讲把 Hazel 事件系统和 Dear ImGui 真正连接到一起：</p>
+<ul>
+<li><code>ImGuiLayer</code> 增加鼠标、键盘和窗口缩放处理函数；</li>
+<li><code>EventDispatcher</code> 根据事件类型路由到对应处理函数；</li>
+<li><code>HZ_BIND_EVENT_FN</code> 简化成员函数绑定；</li>
+<li>鼠标按钮、位置和滚轮状态写入 <code>ImGuiIO</code>；</li>
+<li>窗口缩放同步 <code>DisplaySize</code>、framebuffer scale 与 OpenGL viewport；</li>
+<li>按键状态和左右修饰键写入 ImGui；</li>
+<li>新增 <code>KeyTypedEvent</code>、GLFW char callback 和 <code>AddInputCharacter()</code>；</li>
+<li>ImGui 窗口现在已经可以移动、点击、滚动和输入文本。</li>
+</ul>
+<p>这段实现证明了 Hazel 事件系统已经具备实用价值。接下来需要消除 GLFW 键码依赖，并加入输入轮询，让引擎 API 不只知道“刚刚发生了什么”，也能回答“现在处于什么状态”。</p>
+<h2 id="_2">附：参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=16">Bilibili 精译视频：016 - ImGui 事件</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/tree/709b40de15b6c46db7746c7feb4b2dd98397df99">本期对应代码提交 <code>709b40de</code></a></li>
+<li><a href="https://github.com/ocornut/imgui">Dear ImGui</a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>
