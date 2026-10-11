@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 018：通过 Pull Request 协作</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: #f3f4f6; font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+            code { overflow-wrap: anywhere; word-break: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-018-pull-request">Hazel 游戏引擎笔记 018：通过 Pull Request 协作</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=18">The Cherno 游戏引擎系列第 18 讲“拉取请求”</a>，时长约 24 分 03 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材；PR 编号、合并结果和代码变化已结合同期 Hazel 仓库记录核对。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>上一讲讨论了 GitHub 的基础协作方式。本讲直接查看 Hazel 仓库中正在等待处理的 Pull Request，并演示一个完整的维护者工作流：</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[社区提交 PR] --&gt; B[阅读说明与 diff]
+    B --&gt; C[参与讨论]
+    C --&gt; D{是否适合当前项目}
+    D -- 接受 --&gt; E[请求更新或直接合并]
+    D -- 不适用 --&gt; F[解释原因并关闭]
+    D -- 需要更多讨论 --&gt; G[暂时保持打开]
+    E --&gt; H[拉取到本地并验证]
+</code></pre></div>
+
+<p>关键点不是“所有 PR 都必须合并”，而是让提案、理由、冲突和验证过程都公开可见。PR 同时承担三种功能：</p>
+<ul>
+<li>提交代码变化；</li>
+<li>讨论设计取舍；</li>
+<li>记录为什么最终接受、修改或拒绝某项建议。</li>
+</ul>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_02_03.png" alt="Hazel 仓库中的 Pull Request 列表" loading="lazy">
+  <p class="video-caption">📷 Hazel 仓库中的 Pull Request 列表<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=18&t=123" target="_blank" rel="noopener">回到原视频 (00:02:03)</a></p>
+</div>
+
+<h2 id="1-github">1. GitHub 协作不止是“提交代码”</h2>
+<p><em>(参考时间: 00:00:15)</em></p>
+<p>很多编程教程只讲代码怎么写，却很少解释团队中如何共同维护同一套代码。Cherno 认为，Pull Request 是连接以下两件事的核心机制：</p>
+<ol>
+<li>代码在版本控制系统中如何演化；</li>
+<li>开发者如何讨论、审查和验证这些变化。</li>
+</ol>
+<p>即使团队不使用 GitHub，分支、变更审查和合并的基本思想仍然适用于其它版本控制系统。PR 让一个改动从“某个人本地能运行”变成“项目可以共同理解和接受的变更”。</p>
+<p>对学习 Hazel 的人来说，参与 PR 还有额外价值：读者不再只是逐集抄写代码，而是在真实分支、冲突、讨论和审查中体验软件工程。</p>
+<h3 id="11">1.1 讨论比“谁对谁错”更重要</h3>
+<p>Cherno 特别强调，社区讨论应该保持友好和安全。维护者可能忘记某个改动，也可能不知道更好的实现方式；参与者可以指出问题，但没有必要用技术优越感压制别人。</p>
+<p>一个 PR 即使最终没有被合并，只要讨论清楚，也能成为所有参与者共同学习的记录。</p>
+<h2 id="2-pr">2. 第一批讨论型 PR</h2>
+<p><em>(参考时间: 00:03:46)</em></p>
+<p>仓库里有一些 PR 并没有立刻进入可合并状态，但它们很适合说明维护者如何评估提案。</p>
+<h3 id="21-unique_ptr">2.1 用 unique_ptr 替换原始指针</h3>
+<blockquote>
+<p>PR #2：<code>Use unique pointers instead of raw pointers</code></p>
+</blockquote>
+<p>提案希望把创建 Application 时的原始指针改成 <code>std::unique_ptr</code>，让资源自动释放。同时，PR 还增加了构建后复制 DLL 的步骤。</p>
+<p>Cherno 解释了为什么不接受 unique_ptr 部分：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="o">**</span><span class="w"> </span><span class="n">argv</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">Hazel</span><span class="o">::</span><span class="n">InitCore</span><span class="p">();</span>
+
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">app</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Hazel</span><span class="o">::</span><span class="n">CreateApplication</span><span class="p">();</span>
+<span class="w">    </span><span class="n">app</span><span class="o">-&gt;</span><span class="n">Run</span><span class="p">();</span>
+<span class="w">    </span><span class="k">delete</span><span class="w"> </span><span class="n">app</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">Hazel</span><span class="o">::</span><span class="n">ShutdownCore</span><span class="p">();</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>他的理由包括：</p>
+<ul>
+<li>Application 在进程生命周期中本来就只有一个；</li>
+<li>他希望显式控制删除和 Shutdown 的顺序；</li>
+<li><code>Hazel::Application*</code> 比 <code>std::unique_ptr&lt;Hazel::Application&gt;</code> 更直接；</li>
+<li>原始指针并不自动等同于设计错误，关键是要有明确的所有权约定。</li>
+</ul>
+<p>他还指出，<code>main()</code> 末尾的 <code>return 0;</code> 不是必需的，并引用 cppreference 对程序入口返回值的说明。构建后复制 DLL 的想法本身是好的，但下一集将切换到 Premake，手写 Visual Studio 工程的行为很快会过时。</p>
+<p>这个 PR 展示了重要的一点：<strong>提案可以包含多个变化，但维护者应逐项判断，而不是整包接受或整包拒绝。</strong></p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_04_14.png" alt="PR #2 中关于 unique_ptr、原始指针和显式释放顺序的讨论" loading="lazy">
+  <p class="video-caption">📷 PR #2 中关于 unique_ptr、原始指针和显式释放顺序的讨论<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=18&t=254" target="_blank" rel="noopener">回到原视频 (00:04:14)</a></p>
+</div>
+
+<h3 id="22-cmake-premake">2.2 CMake 与 Premake 的重复维护</h3>
+<blockquote>
+<p>PR #1：<code>Add CMake support to the project</code></p>
+</blockquote>
+<p>提案认为 CMake 能改善跨平台和 IDE 支持，尤其是在 CLion、VS Code 等环境中直接打开项目。讨论中支持者认为 CMake 通用，反对者则指出 Hazel 已经选择 Premake，同时维护两套构建系统会产生重复工作。</p>
+<p>Cherno 倾向于继续使用 Premake：</p>
+<ul>
+<li>Premake 已经足够完成当前构建需求；</li>
+<li>Premake 使用 Lua 配置，语法更直接；</li>
+<li>项目刚开始时同时引入 CMake 会增加维护面；</li>
+<li>是否真正支持 Linux 和 macOS，还需要经过实际环境验证。</li>
+</ul>
+<p>他在视频中没有立刻关闭这个 PR，而是保留讨论。</p>
+<p>编者说明：从当前 GitHub 状态看，PR #1 后来被关闭且没有合并。视频记录的是当时的讨论状态，而不是最终仓库状态。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_06_49.png" alt="CMake 与 Premake 的重复维护讨论" loading="lazy">
+  <p class="video-caption">📷 CMake 与 Premake 的重复维护讨论<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=18&t=409" target="_blank" rel="noopener">回到原视频 (00:06:49)</a></p>
+</div>
+
+<h3 id="23-linux">2.3 Linux 支持与分支冲突</h3>
+<blockquote>
+<p>PR #13：<code>Add Linux support to the project</code></p>
+</blockquote>
+<p>Linux 支持涉及 Premake 配置、Linux 入口以及 GCC 编译问题，是一项比单个文件修复更大的改动。该 PR 当时已经产生冲突，说明它落后于主分支，不能直接合并。</p>
+<p>Cherno 的回复不是简单拒绝，而是要求作者更新分支并确认可以构建：</p>
+<div class="highlight"><pre><span></span><code>请更新这个分支，确认它已经准备好合并。
+我很愿意把它合并进来。
+</code></pre></div>
+
+<p>这正是维护冲突 PR 的常见流程：</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[PR 与主分支冲突] --&gt; B[请求作者同步最新主分支]
+    B --&gt; C{是否能无冲突合并}
+    C -- 否 --&gt; D[作者解决冲突并重新测试]
+    D --&gt; C
+    C -- 是 --&gt; E[维护者本地验证]
+    E --&gt; F{验证通过}
+    F -- 是 --&gt; G[合并]
+    F -- 否 --&gt; B
+</code></pre></div>
+
+<p>编者说明：该 PR 后来没有直接合并，而是转移到新的 Linux 支持 PR #27。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_07_36.png" alt="Linux 支持 PR 存在冲突，需要先更新分支" loading="lazy">
+  <p class="video-caption">📷 Linux 支持 PR 存在冲突，需要先更新分支<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=18&t=456" target="_blank" rel="noopener">回到原视频 (00:07:36)</a></p>
+</div>
+
+<h3 id="24-pr">2.4 已经过时的编译参数 PR</h3>
+<blockquote>
+<p>PR #16：<code>Replace compiler flags with premake properties</code></p>
+</blockquote>
+<p>该 PR 建议用 Premake 属性代替直接写 <code>/MDd</code>、<code>/MD</code> 等编译器参数：</p>
+<div class="highlight"><pre><span></span><code><span class="nv">filter</span><span class="w"> </span><span class="s2">"configurations:Debug"</span>
+<span class="w">    </span><span class="nv">runtime</span><span class="w"> </span><span class="s2">"Debug"</span>
+<span class="w">    </span><span class="nv">staticruntime</span><span class="w"> </span><span class="s2">"Off"</span>
+
+<span class="nv">filter</span><span class="w"> </span><span class="s2">"configurations:Release"</span>
+<span class="w">    </span><span class="nv">runtime</span><span class="w"> </span><span class="s2">"Release"</span>
+<span class="w">    </span><span class="nv">staticruntime</span><span class="w"> </span><span class="s2">"Off"</span>
+</code></pre></div>
+
+<p>但 Hazel 已经完成同类修改，因此这个 PR 不再需要。维护者把它标记为：</p>
+<div class="highlight"><pre><span></span><code>Obsolete; this has already been done.
+</code></pre></div>
+
+<p>这提醒贡献者：<strong>提交 PR 前先同步最新主分支，并检查是否已经有人完成相同改动。</strong></p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_08_41.png" alt="编译参数 PR 已被新的 Premake 属性方案取代" loading="lazy">
+  <p class="video-caption">📷 编译参数 PR 已被新的 Premake 属性方案取代<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=18&t=521" target="_blank" rel="noopener">回到原视频 (00:08:41)</a></p>
+</div>
+
+<h2 id="3-start-project-pr">3. 合并 Start Project PR</h2>
+<p><em>(参考时间: 00:10:00)</em></p>
+<p>一个较小 PR 为解决方案增加了启动项目。Premake 提供了 <code>startproject</code> 属性：</p>
+<div class="highlight"><pre><span></span><code><span class="nv">startproject</span><span class="w"> </span><span class="s2">"Sandbox"</span>
+</code></pre></div>
+
+<p>这样 Visual Studio 打开解决方案后，会默认把 Sandbox 设为启动项目。</p>
+<p>视频中先把这个属性放在项目作用域附近，随后 Premake 报错：</p>
+<div class="highlight"><pre><span></span><code>Unable to set start project.
+Project scope should be in workspace.
+</code></pre></div>
+
+<p>原因是 <code>startproject</code> 必须属于 workspace 作用域，而不是某个 project。正确位置是：</p>
+<div class="highlight"><pre><span></span><code><span class="nv">workspace</span><span class="w"> </span><span class="s2">"Hazel"</span>
+<span class="w">    </span><span class="nv">architecture</span><span class="w"> </span><span class="s2">"x64"</span>
+<span class="w">    </span><span class="nv">startproject</span><span class="w"> </span><span class="s2">"Sandbox"</span>
+
+<span class="w">    </span><span class="nv">configurations</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="s2">"Debug"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"Release"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"Dist"</span>
+<span class="w">    </span><span class="p">}</span>
+</code></pre></div>
+
+<p>修正后，Sandbox 会立即成为默认启动项目。</p>
+<p>这次错误也说明：<strong>PR 被合并并不代表所有细节都已验证。维护者仍然应在本地拉取代码并运行。</strong></p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[发现 PR 有价值] --&gt; B[阅读 diff 和讨论]
+    B --&gt; C[合并到主分支]
+    C --&gt; D[本地 git pull]
+    D --&gt; E[重新生成项目]
+    E --&gt; F{是否成功}
+    F -- 是 --&gt; G[完成]
+    F -- 否 --&gt; H[修复并提交本地变更]
+    H --&gt; G
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_10_00.png" alt="Start Project PR 中添加 startproject 属性" loading="lazy">
+  <p class="video-caption">📷 Start Project PR 中添加 startproject 属性<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=18&t=600" target="_blank" rel="noopener">回到原视频 (00:10:00)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_10_46.png" alt="在 GitHub 页面中合并 Pull Request" loading="lazy">
+  <p class="video-caption">📷 在 GitHub 页面中合并 Pull Request<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=18&t=646" target="_blank" rel="noopener">回到原视频 (00:10:46)</a></p>
+</div>
+
+<h3 id="31">3.1 合并后同步本地仓库</h3>
+<p><em>(参考时间: 00:11:27)</em></p>
+<p>GitHub 上的合并只改变远端仓库。维护者仍需要在本地执行同步：</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>status
+git<span class="w"> </span>pull
+</code></pre></div>
+
+<p>视频中本地还有未提交文件。此时先查看差异、补充提交，再拉取远端变化：</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>add<span class="w"> </span>&lt;files&gt;
+git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Now linking runtime library dynamically"</span>
+git<span class="w"> </span>push
+git<span class="w"> </span>pull
+</code></pre></div>
+
+<p>如果本地提交和远端合并都修改了主分支，Git 可能生成一次 merge 提交。关键不是避免所有 merge commit，而是保证：</p>
+<ul>
+<li>本地不存在误提交的临时文件；</li>
+<li>提交信息能说明改动的目的；</li>
+<li>拉取后重新构建并确认合并结果正常。</li>
+</ul>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_11_31.png" alt="拉取远端 PR 合并结果并处理本地未提交变化" loading="lazy">
+  <p class="video-caption">📷 拉取远端 PR 合并结果并处理本地未提交变化<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=18&t=691" target="_blank" rel="noopener">回到原视频 (00:11:31)</a></p>
+</div>
+
+<h2 id="4-pr">4. 解决依赖分组 PR 的冲突</h2>
+<p><em>(参考时间: 00:14:07)</em></p>
+<blockquote>
+<p>PR #19：<code>Dependencies in a solution folder</code></p>
+</blockquote>
+<p>该 PR 把第三方依赖从解决方案根目录移动到 <code>Dependencies</code> 分组，减少项目列表的杂乱程度：</p>
+<div class="highlight"><pre><span></span><code><span class="nv">group</span><span class="w"> </span><span class="s2">"Dependencies"</span>
+<span class="w">    </span><span class="nv">include</span><span class="w"> </span><span class="s2">"Hazel/vendor/GLFW"</span>
+<span class="w">    </span><span class="nv">include</span><span class="w"> </span><span class="s2">"Hazel/vendor/Glad"</span>
+<span class="w">    </span><span class="nv">include</span><span class="w"> </span><span class="s2">"Hazel/vendor/imgui"</span>
+
+<span class="nv">group</span><span class="w"> </span><span class="s2">""</span>
+</code></pre></div>
+
+<p>最后的 <code>group ""</code> 很重要，它表示依赖分组到此结束，后续项目重新回到默认分组。</p>
+<p>不过维护者刚刚修改了同一个 <code>premake5.lua</code>，所以 PR 出现冲突，暂时不能合并。Cherno 要求作者更新分支：</p>
+<div class="highlight"><pre><span></span><code>Please update this so that I can merge. 🙂
+</code></pre></div>
+
+<p>作者同步后回复 <code>There you go</code>，冲突被解决。</p>
+<p>编者说明：该 PR 在视频之后才正式合并，但它展示的依赖分组方式最终进入了 Hazel 仓库。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_14_07.png" alt="通过 group 和空 group 结束标记整理依赖项目" loading="lazy">
+  <p class="video-caption">📷 通过 group 和空 group 结束标记整理依赖项目<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=18&t=847" target="_blank" rel="noopener">回到原视频 (00:14:07)</a></p>
+</div>
+
+<h2 id="5">5. 修复首次构建失败</h2>
+<p><em>(参考时间: 00:14:52)</em></p>
+<h3 id="51">5.1 复现问题</h3>
+<p>问题发生在清理 <code>bin</code> 目录后第一次构建 Sandbox 时。Hazel DLL 已经生成，但构建后复制命令失败，因为目标 Sandbox 目录尚不存在。</p>
+<p>复现过程是：</p>
+<div class="highlight"><pre><span></span><code>删除 bin
+  -&gt; 重新生成 Visual Studio 工程
+  -&gt; 构建 Sandbox
+  -&gt; 后置复制命令失败
+</code></pre></div>
+
+<p>原命令类似：</p>
+<div class="highlight"><pre><span></span><code><span class="nv">postbuildcommands</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="p">(</span><span class="s2">"{COPY} %{cfg.buildtarget.relpath} ../bin/"</span><span class="w"> </span><span class="o">..</span>
+<span class="w">        </span><span class="nv">outputdir</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="s2">"/Sandbox"</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Premake 或 Windows 的复制行为把目标解释成文件而不是目录，导致第一次构建失败。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[删除 bin 目录] --&gt; B[重新生成工程]
+    B --&gt; C[构建 Sandbox]
+    C --&gt; D{Sandbox 目标目录存在}
+    D -- 否 --&gt; E[复制 Hazel DLL 失败]
+    D -- 是 --&gt; F[复制成功]
+    E --&gt; G[需要修复目标路径或先创建目录]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_16_00.png" alt="删除 bin 后重新构建以复现首次构建失败" loading="lazy">
+  <p class="video-caption">📷 删除 bin 后重新构建以复现首次构建失败<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=18&t=960" target="_blank" rel="noopener">回到原视频 (00:16:00)</a></p>
+</div>
+
+<h3 id="52">5.2 两种修复方案</h3>
+<blockquote>
+<p>PR #21：<code>Fixed build failing first time</code></p>
+</blockquote>
+<p>第一种方案在复制前主动创建目录：</p>
+<div class="highlight"><pre><span></span><code><span class="nv">postbuildcommands</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="p">(</span><span class="s2">"IF NOT EXIST ../bin/"</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="nv">outputdir</span><span class="w"> </span><span class="o">..</span>
+<span class="w">        </span><span class="s2">"/Sandbox mkdir ../bin/"</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="nv">outputdir</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="s2">"/Sandbox"</span><span class="p">),</span>
+<span class="w">    </span><span class="p">(</span><span class="s2">"{COPY} %{cfg.buildtarget.relpath} ../bin/"</span><span class="w"> </span><span class="o">..</span>
+<span class="w">        </span><span class="nv">outputdir</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="s2">"/Sandbox"</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>它能解决问题，但增加了一整条命令，而且只处理“目录不存在”这一种情况。</p>
+<blockquote>
+<p>PR #22：<code>Postbuild command for Hazel project modified</code></p>
+</blockquote>
+<p>第二种方案只修改目标路径格式：</p>
+<div class="highlight"><pre><span></span><code><span class="nv">postbuildcommands</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="p">(</span><span class="s2">"{COPY} %{cfg.buildtarget.relpath} "</span><span class="w"> </span><span class="o">..</span>
+<span class="w">        </span><span class="s2">"</span><span class="se">\"</span><span class="s2">../bin/"</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="nv">outputdir</span><span class="w"> </span><span class="o">..</span><span class="w"> </span><span class="s2">"/Sandbox/</span><span class="se">\"</span><span class="s2">"</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>关键变化有两点：</p>
+<ul>
+<li>目标路径增加引号；</li>
+<li>路径末尾保留 <code>/</code>。</li>
+</ul>
+<p>引号可以让 Premake 保留结尾斜杠，也避免路径中包含空格时被错误拆分。Windows 接收带结尾斜杠的路径后，会把它理解成目录。</p>
+<p>Cherno 更喜欢第二种方案，因为改动更小、意图更清楚，不需要额外写 <code>IF NOT EXIST</code> 和 <code>mkdir</code>。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_17_47.png" alt="第一次构建失败与两个修复方案的对比" loading="lazy">
+  <p class="video-caption">📷 第一次构建失败与两个修复方案的对比<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=18&t=1067" target="_blank" rel="noopener">回到原视频 (00:17:47)</a></p>
+</div>
+
+<h3 id="53">5.3 验证修复</h3>
+<p>修复后再次删除 <code>bin</code>，重新生成项目并构建 Sandbox。此次构建成功，说明路径在目录不存在时也能被正确创建或处理。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_18_25.png" alt="清理 bin 后首次构建成功" loading="lazy">
+  <p class="video-caption">📷 清理 bin 后首次构建成功<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=18&t=1105" target="_blank" rel="noopener">回到原视频 (00:18:25)</a></p>
+</div>
+
+<p>Cherno 没有直接替作者提交代码，而是请求贡献者更新自己的分支：</p>
+<div class="highlight"><pre><span></span><code>Please update this so that I can merge it. 🙂
+</code></pre></div>
+
+<p>这样做既保留贡献记录，也让 PR 作者获得对应的协作信用。作者更新后，PR #22 被合并。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_19_29.png" alt="请求贡献者更新分支后再合并" loading="lazy">
+  <p class="video-caption">📷 请求贡献者更新分支后再合并<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=18&t=1169" target="_blank" rel="noopener">回到原视频 (00:19:29)</a></p>
+</div>
+
+<h2 id="6-pull-request">6. 如何自己提交一个 Pull Request</h2>
+<p><em>(参考时间: 00:21:30)</em></p>
+<p>一个标准协作流程如下：</p>
+<ol>
+<li>Fork Hazel 到自己的 GitHub 账号；</li>
+<li>克隆自己的 fork；</li>
+<li>创建描述明确的分支；</li>
+<li>完成修改并在本地构建、测试；</li>
+<li>提交并推送到自己的 fork；</li>
+<li>从功能分支向 Hazel 主分支发起 PR；</li>
+<li>在 PR 页面查看完整 diff；</li>
+<li>回应评论并更新分支；</li>
+<li>维护者验证后合并。</li>
+</ol>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant D as Developer
+    participant F as Fork
+    participant H as Hazel
+    participant M as Maintainer
+
+    D-&gt;&gt;H: Fork 仓库
+    D-&gt;&gt;F: 创建功能分支
+    D-&gt;&gt;F: commit + push
+    D-&gt;&gt;H: 发起 Pull Request
+    M-&gt;&gt;H: 阅读说明、diff 和讨论
+    M--&gt;&gt;D: 请求修改或说明原因
+    D-&gt;&gt;F: 更新分支
+    F--&gt;&gt;H: PR 自动更新
+    M-&gt;&gt;H: 验证并合并
+</code></pre></div>
+
+<p>一个有效的 PR 说明至少应回答：</p>
+<ul>
+<li>这个改动解决什么问题？</li>
+<li>为什么采用当前方案？</li>
+<li>修改了哪些模块？</li>
+<li>如何构建和验证？</li>
+<li>是否存在相关 Issue 或前序 PR？</li>
+</ul>
+<p>在视频中，维护者会使用 <code>#22</code> 这样的引用链接把 PR 和 Issue 连接起来，保持讨论上下文可追踪。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_21_30.png" alt="从 fork、分支到 Pull Request 和合并的完整流程" loading="lazy">
+  <p class="video-caption">📷 从 fork、分支到 Pull Request 和合并的完整流程<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=18&t=1290" target="_blank" rel="noopener">回到原视频 (00:21:30)</a></p>
+</div>
+
+<h2 id="7-pull-request">7. 维护者应该如何处理 Pull Request</h2>
+<p>本讲实际上给出了一个可复用的审查清单：</p>
+<h3 id="71">7.1 先理解动机，再看实现</h3>
+<p>PR 描述和讨论能说明作者为什么修改。只看 diff 容易把“设计方向不同”误判为“实现错误”。</p>
+<h3 id="72">7.2 逐项评估变化</h3>
+<p>一个 PR 可能有多个目的。维护者应分别判断每个部分，而不是整包接受。</p>
+<h3 id="73">7.3 在合并前测试</h3>
+<p>自动合并按钮不会替你运行项目。<code>startproject</code> 作用域错误和首次构建失败都说明，合并后仍需在本地重新生成并构建。</p>
+<h3 id="74">7.4 冲突时请求更新</h3>
+<p>如果 PR 落后于主分支，应要求作者 rebase 或合并最新主分支，而不是在维护者侧猜测冲突的正确解决方式。</p>
+<h3 id="75">7.5 给出明确结论</h3>
+<p>维护者可以选择：</p>
+<table>
+<thead>
+<tr>
+<th>结论</th>
+<th>适用情况</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Merge</td>
+<td>方案合理、无冲突、验证通过</td>
+</tr>
+<tr>
+<td>Request update</td>
+<td>方向可行，但分支过期或实现需调整</td>
+</tr>
+<tr>
+<td>Keep open</td>
+<td>需要继续讨论，暂时不宜决定</td>
+</tr>
+<tr>
+<td>Close / obsolete</td>
+<td>已被其它改动覆盖</td>
+</tr>
+<tr>
+<td>Close / not planned</td>
+<td>与项目方向不一致，且已解释原因</td>
+</tr>
+</tbody>
+</table>
+<h3 id="76">7.6 保留贡献信用</h3>
+<p>如果贡献者有时间和能力更新分支，维护者不应直接复制代码替对方提交。请求作者更新既能让贡献记录归到正确的人，也能让贡献者真正参与完整流程。</p>
+<h2 id="8">8. 本节结论</h2>
+<p>本讲通过真实 PR 展示了团队协作的关键环节：</p>
+<ul>
+<li>PR 不只是代码提交，也是设计讨论与知识沉淀；</li>
+<li>维护者需要区分已接受、待讨论、过时和与项目方向不符的提案；</li>
+<li>合并 PR 后必须同步本地 <code>main</code> 并重新构建；</li>
+<li>冲突通常由 PR 作者更新分支解决；</li>
+<li><code>startproject</code> 必须位于 Premake workspace 作用域；</li>
+<li>构建后复制路径使用引号和结尾斜杠，可以避免首次构建失败；</li>
+<li>小型、目标清楚的修复通常更容易审查和合并；</li>
+<li>请求贡献者更新分支，可以保留协作记录与贡献信用。</li>
+</ul>
+<p>下一讲将回到 Hazel 的实际开发，开始处理键盘、鼠标编码与输入轮询。</p>
+<h2 id="pr">附：相关 PR 与参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=18">Bilibili 精译视频：018 - 拉取请求</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/pull/1">PR #1：Add CMake support to the project</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/pull/2">PR #2：Use unique pointers instead of raw pointers</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/pull/13">PR #13：Add Linux support to the project</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/pull/16">PR #16：Replace compiler flags with premake properties</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/pull/19">PR #19：Dependencies in a solution folder</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/pull/21">PR #21：Fixed build failing first time</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/pull/22">PR #22：Postbuild command for Hazel project modified</a></li>
+<li><a href="https://en.cppreference.com/w/cpp/language/main_function">C++ 程序入口返回值说明</a></li>
+<li><a href="https://github.com/TheCherno/Hazel">The Cherno 的 Hazel 仓库</a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>

@@ -28,6 +28,10 @@
   - [Markdown 版本](<Hazel Game Engine/016 - ImGui Events/book.md>)
   - 视频来源：[Bilibili 精译版第 16 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=16)
   - 主题：`EventDispatcher` 路由、鼠标与窗口缩放、键盘修饰键、`KeyTypedEvent` 和 GLFW 字符输入
+- [018 - Pull Requests](<Hazel Game Engine/018 - Pull Requests/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/018 - Pull Requests/book.md>)
+  - 视频来源：[Bilibili 精译版第 18 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=18)
+  - 主题：PR 审查与讨论、分支冲突、本地同步、Premake `startproject`、首次构建失败修复和贡献流程
 
 ## 南京大学操作系统原理 2026
 
