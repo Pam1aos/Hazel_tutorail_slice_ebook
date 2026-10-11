@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 022：ImGui 停靠与视口</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: #f3f4f6; font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+            code { overflow-wrap: anywhere; word-break: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-022imgui">Hazel 游戏引擎笔记 022：ImGui 停靠与视口</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22">The Cherno 游戏引擎系列第 22 讲“ImGui 停靠与视口”</a>，时长约 31 分 34 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。代码参考提交：<a href="https://github.com/TheCherno/Hazel/tree/7c02b7863f1d70af88b7c447b223c9da4dc9e04a"><code>7c02b786</code></a>。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材；术语和代码以原视频及同期 Hazel 仓库为准。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>上一讲的 ImGui 集成是 Hazel 自己根据 ImGui GLFW 示例重写的：Hazel 事件被手动翻译为 <code>ImGuiIO</code> 状态，渲染也依赖复制进项目的 OpenGL3 示例代码。</p>
+<p>这套实现适合理解原理，但 ImGui 正在快速增加 Docking 和 Viewports 等复杂功能。继续分叉维护会让 Hazel 越来越难追上上游。</p>
+<p>本讲决定改成：</p>
+<ol>
+<li>使用 ImGui docking 分支；</li>
+<li>直接编译官方 GLFW 与 OpenGL3 后端；</li>
+<li>尽量不修改官方后端代码；</li>
+<li>Hazel 只负责生命周期和 Begin / End 阶段；</li>
+<li>让所有 Layer 都能通过 <code>OnImGuiRender()</code> 绘制 UI。</li>
+</ol>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[旧方案: 自己复制并维护 ImGui 输入/渲染] --&gt; B[难以跟进上游]
+    B --&gt; C[新方案: 使用官方后端代码]
+    C --&gt; D[Hazel 只负责生命周期与渲染阶段]
+    D --&gt; E[更容易合并 ImGui 更新]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_02_47.png" alt="旧 ImGui 集成包含较多自行维护的代码" loading="lazy">
+  <p class="video-caption">📷 旧 ImGui 集成包含较多自行维护的代码<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=167" target="_blank" rel="noopener">回到原视频 (00:02:47)</a></p>
+</div>
+
+<h2 id="1-docking-viewports">1. Docking 与 Viewports 的价值</h2>
+<h3 id="11-docking-dock-space">1.1 Docking：把窗口组织成 Dock Space</h3>
+<p>Docking 允许像 Visual Studio 一样拖动面板、拆分区域、形成标签页。Hazel 未来的关卡编辑器可以直接把场景、资源浏览器、属性面板和日志放进 Dock Space，而不需要引入 Qt、WPF 或 WinForms。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Dock Space] --&gt; B[中央 Scene View]
+    A --&gt; C[侧边 Inspector]
+    A --&gt; D[底部 Console]
+    A --&gt; E[Asset Browser]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_04_48.png" alt="Docking 可以把多个面板组织成专业编辑器布局" loading="lazy">
+  <p class="video-caption">📷 Docking 可以把多个面板组织成专业编辑器布局<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=288" target="_blank" rel="noopener">回到原视频 (00:04:48)</a></p>
+</div>
+
+<h3 id="12-viewports">1.2 Viewports：窗口可拖出主应用</h3>
+<p>Viewports 让 ImGui 窗口可以离开主应用窗口。ImGui 会为它创建新的平台窗口和渲染上下文，使一个面板看起来像独立操作系统窗口。</p>
+<p>这对多显示器开发非常实用。例如，可以把 Scene View 或 Console 拖到第二块屏幕，而主窗口继续保留编辑器布局。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_05_34.png" alt="Viewports 允许 ImGui 窗口脱离主应用窗口" loading="lazy">
+  <p class="video-caption">📷 Viewports 允许 ImGui 窗口脱离主应用窗口<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=334" target="_blank" rel="noopener">回到原视频 (00:05:34)</a></p>
+</div>
+
+<h3 id="13">1.3 为什么不再自己实现</h3>
+<p>Docking 分支尚未并入 ImGui <code>master</code>，功能仍在变化。如果 Hazel 复制后大量修改，每次上游更新都要手工合并。</p>
+<p>因此本讲采用官方提供的：</p>
+<ul>
+<li><code>imgui_impl_glfw.cpp</code>；</li>
+<li><code>imgui_impl_opengl3.cpp</code>；</li>
+<li>对应头文件。</li>
+</ul>
+<p>目标是让 Hazel 与 ImGui 代码尽量不产生分叉。</p>
+<h2 id="2-imgui-docking">2. 切换 ImGui 子模块到 docking 分支</h2>
+<p><em>(参考时间: 00:08:51)</em></p>
+<p>ImGui 是 Git 子模块。先进入子模块目录：</p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>Hazel/vendor/imgui
+git<span class="w"> </span>status
+git<span class="w"> </span>checkout<span class="w"> </span>docking
+</code></pre></div>
+
+<p>然后返回 Hazel 根目录，把子模块的新提交记录到主仓库：</p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>../../..
+git<span class="w"> </span>status
+git<span class="w"> </span>add<span class="w"> </span>Hazel/vendor/imgui
+git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Switch ImGui to docking branch"</span>
+</code></pre></div>
+
+<p>切分支的本质不是修改子模块内容，而是修改主仓库记录的子模块提交指针。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Hazel 主仓库] --&gt; B[记录 ImGui 子模块提交]
+    B --&gt; C[进入 vendor/imgui]
+    C --&gt; D[git checkout docking]
+    D --&gt; E[子模块 HEAD 改变]
+    E --&gt; F[主仓库 git add vendor/imgui]
+    F --&gt; G[提交新的子模块指针]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_08_51.png" alt="在子模块中切换到 ImGui docking 分支" loading="lazy">
+  <p class="video-caption">📷 在子模块中切换到 ImGui docking 分支<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=531" target="_blank" rel="noopener">回到原视频 (00:08:51)</a></p>
+</div>
+
+<h2 id="3-imgui">3. 编译官方 ImGui 后端</h2>
+<p><em>(参考时间: 00:10:34)</em></p>
+<p>docking 分支中需要编译两个实现文件：</p>
+<div class="highlight"><pre><span></span><code>Hazel/vendor/imgui/examples/imgui_impl_glfw.cpp
+Hazel/vendor/imgui/examples/imgui_impl_opengl3.cpp
+</code></pre></div>
+
+<p>不直接把两个文件逐项加入 Premake，而是新增一个统一编译单元：</p>
+<div class="highlight"><pre><span></span><code>Hazel/src/Hazel/ImGui/ImGuiBuild.cpp
+</code></pre></div>
+
+<p>内容如下：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"hzpch.h"</span>
+
+<span class="cp">#define IMGUI_IMPL_OPENGL_LOADER_GLAD</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"examples/imgui_impl_opengl3.cpp"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"examples/imgui_impl_glfw.cpp"</span>
+</code></pre></div>
+
+<h3 id="31-cpp">3.1 为什么使用包含 <code>.cpp</code> 的方式</h3>
+<p>这是一种小型 unity build：</p>
+<ul>
+<li>只增加一个 Hazel 编译文件；</li>
+<li>明确由 Hazel 控制宏定义；</li>
+<li>不修改 ImGui 子模块；</li>
+<li>需要调整 loader 时只改一处。</li>
+</ul>
+<p><code>IMGUI_IMPL_OPENGL_LOADER_GLAD</code> 告诉 ImGui 的 OpenGL3 后端使用 Glad 加载 OpenGL 函数，而不是使用它默认假设的加载器。</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[ImGuiBuild.cpp] --&gt; B[定义 GLAD loader]
+    B --&gt; C[包含 imgui_impl_opengl3.cpp]
+    B --&gt; D[包含 imgui_impl_glfw.cpp]
+    C --&gt; E[OpenGL3 后端符号]
+    D --&gt; F[GLFW 平台后端符号]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_11_10.png" alt="通过 ImGuiBuild.cpp 编译官方 GLFW 与 OpenGL3 后端" loading="lazy">
+  <p class="video-caption">📷 通过 ImGuiBuild.cpp 编译官方 GLFW 与 OpenGL3 后端<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=670" target="_blank" rel="noopener">回到原视频 (00:11:10)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_12_08.png" alt="定义 IMGUI_IMPL_OPENGL_LOADER_GLAD 后成功编译" loading="lazy">
+  <p class="video-caption">📷 定义 IMGUI_IMPL_OPENGL_LOADER_GLAD 后成功编译<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=728" target="_blank" rel="noopener">回到原视频 (00:12:08)</a></p>
+</div>
+
+<p>旧的 <code>Hazel/src/Platform/OpenGL/ImGuiOpenGLRenderer.*</code> 随之删除，不再维护复制版 OpenGL 渲染器。</p>
+<h2 id="4-imguilayer">4. 重写 ImGuiLayer</h2>
+<p><em>(参考时间: 00:12:55)</em></p>
+<h3 id="41">4.1 删除手写事件翻译</h3>
+<p>旧 <code>ImGuiLayer</code> 包含大量：</p>
+<ul>
+<li>MouseButton pressed / released；</li>
+<li>MouseMoved / MouseScrolled；</li>
+<li>KeyPressed / KeyReleased / KeyTyped；</li>
+<li>WindowResize；</li>
+<li>键盘映射与鼠标状态同步。</li>
+</ul>
+<p>官方 GLFW 后端已经能处理这些输入，并会在 <code>ImGui_ImplGlfw_NewFrame()</code> 中同步状态。因此这些自定义处理代码全部删除。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[旧: Hazel Event] --&gt; B[ImGuiLayer 手工转换]
+    B --&gt; C[ImGuiIO]
+    D[新: GLFW 官方后端] --&gt; C
+    E[ImGui_ImplGlfw_NewFrame] --&gt; C
+</code></pre></div>
+
+<p>这不是放弃 Hazel 事件系统，而是避免把 ImGui 输入适配层重复维护在 Hazel 中。</p>
+<h3 id="42-imguilayer">4.2 ImGuiLayer 接口</h3>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">ImGuiLayer</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">Layer</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">ImGuiLayer</span><span class="p">();</span>
+<span class="w">    </span><span class="o">~</span><span class="n">ImGuiLayer</span><span class="p">();</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">OnAttach</span><span class="p">()</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">OnDetach</span><span class="p">()</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">OnImGuiRender</span><span class="p">()</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">Begin</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">End</span><span class="p">();</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">m_Time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p><code>OnUpdate()</code> 和 <code>OnEvent()</code> 不再需要。真正由外层控制的是 <code>Begin()</code> 与 <code>End()</code>。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_12_55.png" alt="重写 ImGuiLayer.h，移除手写事件函数" loading="lazy">
+  <p class="video-caption">📷 重写 ImGuiLayer.h，移除手写事件函数<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=775" target="_blank" rel="noopener">回到原视频 (00:12:55)</a></p>
+</div>
+
+<h2 id="5-onattach-imgui">5. OnAttach：配置 ImGui 与官方后端</h2>
+<p>参考提交中的初始化：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">ImGuiLayer::OnAttach</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">IMGUI_CHECKVERSION</span><span class="p">();</span>
+<span class="w">    </span><span class="n">ImGui</span><span class="o">::</span><span class="n">CreateContext</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">ImGuiIO</span><span class="o">&amp;</span><span class="w"> </span><span class="n">io</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImGui</span><span class="o">::</span><span class="n">GetIO</span><span class="p">();</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">ConfigFlags</span><span class="w"> </span><span class="o">|=</span>
+<span class="w">        </span><span class="n">ImGuiConfigFlags_NavEnableKeyboard</span><span class="p">;</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">ConfigFlags</span><span class="w"> </span><span class="o">|=</span>
+<span class="w">        </span><span class="n">ImGuiConfigFlags_DockingEnable</span><span class="p">;</span>
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">ConfigFlags</span><span class="w"> </span><span class="o">|=</span>
+<span class="w">        </span><span class="n">ImGuiConfigFlags_ViewportsEnable</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">ImGui</span><span class="o">::</span><span class="n">StyleColorsDark</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">ImGuiStyle</span><span class="o">&amp;</span><span class="w"> </span><span class="n">style</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImGui</span><span class="o">::</span><span class="n">GetStyle</span><span class="p">();</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">io</span><span class="p">.</span><span class="n">ConfigFlags</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">ImGuiConfigFlags_ViewportsEnable</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">style</span><span class="p">.</span><span class="n">WindowRounding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">;</span>
+<span class="w">        </span><span class="n">style</span><span class="p">.</span><span class="n">Colors</span><span class="p">[</span><span class="n">ImGuiCol_WindowBg</span><span class="p">].</span><span class="n">w</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.0f</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">Application</span><span class="o">&amp;</span><span class="w"> </span><span class="n">app</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Application</span><span class="o">::</span><span class="n">Get</span><span class="p">();</span>
+<span class="w">    </span><span class="n">GLFWwindow</span><span class="o">*</span><span class="w"> </span><span class="n">window</span><span class="w"> </span><span class="o">=</span>
+<span class="w">        </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">GLFWwindow</span><span class="o">*&gt;</span><span class="p">(</span>
+<span class="w">            </span><span class="n">app</span><span class="p">.</span><span class="n">GetWindow</span><span class="p">().</span><span class="n">GetNativeWindow</span><span class="p">());</span>
+
+<span class="w">    </span><span class="n">ImGui_ImplGlfw_InitForOpenGL</span><span class="p">(</span><span class="n">window</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+<span class="w">    </span><span class="n">ImGui_ImplOpenGL3_Init</span><span class="p">(</span><span class="s">"#version 410"</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>各配置项作用：</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NavEnableKeyboard</code></td>
+<td>允许键盘导航 ImGui</td>
+</tr>
+<tr>
+<td><code>DockingEnable</code></td>
+<td>启用窗口停靠</td>
+</tr>
+<tr>
+<td><code>ViewportsEnable</code></td>
+<td>允许 ImGui 窗口创建独立平台窗口</td>
+</tr>
+</tbody>
+</table>
+<p>启用 Viewports 后，主窗口与浮动平台窗口要保持统一外观，因此把：</p>
+<div class="highlight"><pre><span></span><code><span class="n">style</span><span class="p">.</span><span class="n">WindowRounding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">;</span>
+<span class="n">style</span><span class="p">.</span><span class="n">Colors</span><span class="p">[</span><span class="n">ImGuiCol_WindowBg</span><span class="p">].</span><span class="n">w</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.0f</span><span class="p">;</span>
+</code></pre></div>
+
+<h3 id="51">5.1 官方后端初始化</h3>
+<div class="highlight"><pre><span></span><code><span class="n">ImGui_ImplGlfw_InitForOpenGL</span><span class="p">(</span><span class="n">window</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+<span class="n">ImGui_ImplOpenGL3_Init</span><span class="p">(</span><span class="s">"#version 410"</span><span class="p">);</span>
+</code></pre></div>
+
+<p>第二个参数 <code>true</code> 表示由 ImGui 后端安装 GLFW 输入回调。此前的 Hazel 手写事件同步因此不再需要。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_14_00.png" alt="在 OnAttach 中启用 Docking 与 Viewports 并初始化官方后端" loading="lazy">
+  <p class="video-caption">📷 在 OnAttach 中启用 Docking 与 Viewports 并初始化官方后端<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=840" target="_blank" rel="noopener">回到原视频 (00:14:00)</a></p>
+</div>
+
+<h2 id="6-begin">6. Begin：开始一帧</h2>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">ImGuiLayer::Begin</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">ImGui_ImplOpenGL3_NewFrame</span><span class="p">();</span>
+<span class="w">    </span><span class="n">ImGui_ImplGlfw_NewFrame</span><span class="p">();</span>
+<span class="w">    </span><span class="n">ImGui</span><span class="o">::</span><span class="n">NewFrame</span><span class="p">();</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>顺序很重要：</p>
+<ol>
+<li>准备 OpenGL3 渲染后端；</li>
+<li>准备 GLFW 平台后端并同步输入；</li>
+<li>开始 ImGui 逻辑帧。</li>
+</ol>
+<p>Begin 与 End 之间的这段时间，任何 Layer 都可以提交 ImGui UI。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_15_43.png" alt="Begin 阶段依次调用 OpenGL3、GLFW 和 ImGui NewFrame" loading="lazy">
+  <p class="video-caption">📷 Begin 阶段依次调用 OpenGL3、GLFW 和 ImGui NewFrame<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=943" target="_blank" rel="noopener">回到原视频 (00:15:43)</a></p>
+</div>
+
+<h2 id="7-onimguirender-layer-ui">7. OnImGuiRender：让 Layer 绘制 UI</h2>
+<p>在 <code>Layer</code> 基类增加：</p>
+<div class="highlight"><pre><span></span><code><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">OnImGuiRender</span><span class="p">()</span><span class="w"> </span><span class="p">{}</span>
+</code></pre></div>
+
+<p>之后 ExampleLayer 可以重写：</p>
+<div class="highlight"><pre><span></span><code><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">OnImGuiRender</span><span class="p">()</span><span class="w"> </span><span class="k">override</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">show</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="w">    </span><span class="n">ImGui</span><span class="o">::</span><span class="n">ShowDemoWindow</span><span class="p">(</span><span class="o">&amp;</span><span class="n">show</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>或者：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">OnImGuiRender</span><span class="p">()</span><span class="w"> </span><span class="k">override</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">ImGui</span><span class="o">::</span><span class="n">Begin</span><span class="p">(</span><span class="s">"Test"</span><span class="p">);</span>
+<span class="w">    </span><span class="n">ImGui</span><span class="o">::</span><span class="n">Text</span><span class="p">(</span><span class="s">"Hello World"</span><span class="p">);</span>
+<span class="w">    </span><span class="n">ImGui</span><span class="o">::</span><span class="n">End</span><span class="p">();</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Layer 不再需要知道：</p>
+<div class="highlight"><pre><span></span><code><span class="n">ImGui</span><span class="o">::</span><span class="n">NewFrame</span><span class="p">();</span>
+<span class="n">ImGui</span><span class="o">::</span><span class="n">Render</span><span class="p">();</span>
+<span class="n">ImGui_ImplOpenGL3_RenderDrawData</span><span class="p">(...);</span>
+</code></pre></div>
+
+<p>它只负责声明自己的 UI。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant A as Application
+    participant L as ImGuiLayer
+    participant G as Game Layer
+
+    A-&gt;&gt;L: Begin()
+    A-&gt;&gt;G: OnImGuiRender()
+    G-&gt;&gt;G: ImGui::Begin/Text/End
+    A-&gt;&gt;L: End()
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_19_00.png" alt="Layer 通过 OnImGuiRender 声明窗口和控件" loading="lazy">
+  <p class="video-caption">📷 Layer 通过 OnImGuiRender 声明窗口和控件<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=1140" target="_blank" rel="noopener">回到原视频 (00:19:00)</a></p>
+</div>
+
+<h2 id="8-end-ui">8. End：渲染 UI 与平台窗口</h2>
+<p><em>(参考时间: 00:17:27)</em></p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">ImGuiLayer::End</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">ImGuiIO</span><span class="o">&amp;</span><span class="w"> </span><span class="n">io</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImGui</span><span class="o">::</span><span class="n">GetIO</span><span class="p">();</span>
+<span class="w">    </span><span class="n">Application</span><span class="o">&amp;</span><span class="w"> </span><span class="n">app</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Application</span><span class="o">::</span><span class="n">Get</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">io</span><span class="p">.</span><span class="n">DisplaySize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImVec2</span><span class="p">(</span>
+<span class="w">        </span><span class="n">app</span><span class="p">.</span><span class="n">GetWindow</span><span class="p">().</span><span class="n">GetWidth</span><span class="p">(),</span>
+<span class="w">        </span><span class="n">app</span><span class="p">.</span><span class="n">GetWindow</span><span class="p">().</span><span class="n">GetHeight</span><span class="p">());</span>
+
+<span class="w">    </span><span class="n">ImGui</span><span class="o">::</span><span class="n">Render</span><span class="p">();</span>
+<span class="w">    </span><span class="n">ImGui_ImplOpenGL3_RenderDrawData</span><span class="p">(</span>
+<span class="w">        </span><span class="n">ImGui</span><span class="o">::</span><span class="n">GetDrawData</span><span class="p">());</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">io</span><span class="p">.</span><span class="n">ConfigFlags</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">ImGuiConfigFlags_ViewportsEnable</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">GLFWwindow</span><span class="o">*</span><span class="w"> </span><span class="n">backup_current_context</span><span class="w"> </span><span class="o">=</span>
+<span class="w">            </span><span class="n">glfwGetCurrentContext</span><span class="p">();</span>
+
+<span class="w">        </span><span class="n">ImGui</span><span class="o">::</span><span class="n">UpdatePlatformWindows</span><span class="p">();</span>
+<span class="w">        </span><span class="n">ImGui</span><span class="o">::</span><span class="n">RenderPlatformWindowsDefault</span><span class="p">();</span>
+
+<span class="w">        </span><span class="n">glfwMakeContextCurrent</span><span class="p">(</span><span class="n">backup_current_context</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="81-displaysize">8.1 设置 DisplaySize</h3>
+<p>主 ImGui 上下文需要知道主窗口尺寸：</p>
+<div class="highlight"><pre><span></span><code><span class="n">io</span><span class="p">.</span><span class="n">DisplaySize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImVec2</span><span class="p">(</span><span class="n">width</span><span class="p">,</span><span class="w"> </span><span class="n">height</span><span class="p">);</span>
+</code></pre></div>
+
+<h3 id="82-drawdata">8.2 渲染主窗口 DrawData</h3>
+<div class="highlight"><pre><span></span><code><span class="n">ImGui</span><span class="o">::</span><span class="n">Render</span><span class="p">();</span>
+<span class="n">ImGui_ImplOpenGL3_RenderDrawData</span><span class="p">(</span>
+<span class="w">    </span><span class="n">ImGui</span><span class="o">::</span><span class="n">GetDrawData</span><span class="p">());</span>
+</code></pre></div>
+
+<h3 id="83">8.3 处理浮动平台窗口</h3>
+<div class="highlight"><pre><span></span><code><span class="n">ImGui</span><span class="o">::</span><span class="n">UpdatePlatformWindows</span><span class="p">();</span>
+<span class="n">ImGui</span><span class="o">::</span><span class="n">RenderPlatformWindowsDefault</span><span class="p">();</span>
+</code></pre></div>
+
+<p>这些调用会更新并渲染被拖出主窗口的 ImGui 平台窗口。</p>
+<p>渲染平台窗口时可能切换 OpenGL 上下文。为了不影响 Hazel 后续渲染，需要先保存并恢复原来的上下文：</p>
+<div class="highlight"><pre><span></span><code><span class="n">GLFWwindow</span><span class="o">*</span><span class="w"> </span><span class="n">backup_current_context</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">glfwGetCurrentContext</span><span class="p">();</span>
+
+<span class="c1">// ...</span>
+<span class="n">glfwMakeContextCurrent</span><span class="p">(</span><span class="n">backup_current_context</span><span class="p">);</span>
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[ImGui::Render] --&gt; B[提交主窗口 DrawData]
+    B --&gt; C{ViewportsEnable?}
+    C -- 否 --&gt; D[End 完成]
+    C -- 是 --&gt; E[保存当前 GLFW 上下文]
+    E --&gt; F[UpdatePlatformWindows]
+    F --&gt; G[RenderPlatformWindowsDefault]
+    G --&gt; H[恢复原上下文]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_17_27.png" alt="End 阶段渲染主 DrawData 并处理浮动平台窗口" loading="lazy">
+  <p class="video-caption">📷 End 阶段渲染主 DrawData 并处理浮动平台窗口<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=1047" target="_blank" rel="noopener">回到原视频 (00:17:27)</a></p>
+</div>
+
+<h2 id="9-application-imguilayer">9. 由 Application 统一拥有 ImGuiLayer</h2>
+<p><em>(参考时间: 00:20:00)</em></p>
+<p>旧 Sandbox 手动执行：</p>
+<div class="highlight"><pre><span></span><code><span class="n">PushOverlay</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">Hazel</span><span class="o">::</span><span class="n">ImGuiLayer</span><span class="p">());</span>
+</code></pre></div>
+
+<p>新设计中，ImGui 是 Hazel Runtime 的基础 UI 设施，因此由 Application 自动创建：</p>
+<div class="highlight"><pre><span></span><code><span class="n">m_ImGuiLayer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">ImGuiLayer</span><span class="p">();</span>
+<span class="n">PushOverlay</span><span class="p">(</span><span class="n">m_ImGuiLayer</span><span class="p">);</span>
+</code></pre></div>
+
+<p>Sandbox 不再需要创建 ImGuiLayer。</p>
+<h3 id="91-layerstack">9.1 所有权必须与 LayerStack 一致</h3>
+<p>视频中最初尝试把 ImGuiLayer 写成 <code>std::unique_ptr</code>，随后发现不正确：<code>PushOverlay()</code> 会把指针交给 LayerStack，LayerStack 负责最终删除。</p>
+<p>因此成员声明应保持裸指针：</p>
+<div class="highlight"><pre><span></span><code><span class="n">ImGuiLayer</span><span class="o">*</span><span class="w"> </span><span class="n">m_ImGuiLayer</span><span class="p">;</span>
+</code></pre></div>
+
+<p>这里使用裸指针不是忽略所有权，而是因为所有权已经明确转移给 LayerStack。</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[Application] --&gt; B[创建 ImGuiLayer]
+    B --&gt; C[PushOverlay]
+    C --&gt; D[LayerStack 持有所有权]
+    D --&gt; E[LayerStack 析构时删除]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_23_30.png" alt="Application 自动创建并把 ImGuiLayer 推入 Overlay" loading="lazy">
+  <p class="video-caption">📷 Application 自动创建并把 ImGuiLayer 推入 Overlay<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=1410" target="_blank" rel="noopener">回到原视频 (00:23:30)</a></p>
+</div>
+
+<h3 id="92-application">9.2 Application 主循环</h3>
+<div class="highlight"><pre><span></span><code><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">m_Running</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glClearColor</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">glClear</span><span class="p">(</span><span class="n">GL_COLOR_BUFFER_BIT</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">layer</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">m_LayerStack</span><span class="p">)</span>
+<span class="w">        </span><span class="n">layer</span><span class="o">-&gt;</span><span class="n">OnUpdate</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">m_ImGuiLayer</span><span class="o">-&gt;</span><span class="n">Begin</span><span class="p">();</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">layer</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">m_LayerStack</span><span class="p">)</span>
+<span class="w">        </span><span class="n">layer</span><span class="o">-&gt;</span><span class="n">OnImGuiRender</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">m_ImGuiLayer</span><span class="o">-&gt;</span><span class="n">End</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">m_Window</span><span class="o">-&gt;</span><span class="n">OnUpdate</span><span class="p">();</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>所有 Layer 的 ImGui 代码都夹在同一组 Begin / End 之间。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_22_33.png" alt="Application 主循环调用所有 Layer 的 OnImGuiRender" loading="lazy">
+  <p class="video-caption">📷 Application 主循环调用所有 Layer 的 OnImGuiRender<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=1353" target="_blank" rel="noopener">回到原视频 (00:22:33)</a></p>
+</div>
+
+<h2 id="10-layerstack">10. 修复 LayerStack 迭代器失效</h2>
+<p><em>(参考时间: 00:24:24)</em></p>
+<p>旧 LayerStack 保存一个迭代器：</p>
+<div class="highlight"><pre><span></span><code><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Layer</span><span class="o">*&gt;::</span><span class="n">iterator</span><span class="w"> </span><span class="n">m_LayerInsert</span><span class="p">;</span>
+</code></pre></div>
+
+<p>当 <code>std::vector</code> 扩容时，已有迭代器会失效。继续使用它会产生未定义行为。</p>
+<p>新实现改用索引：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">m_LayerInsertIndex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+</code></pre></div>
+
+<p>PushLayer：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">LayerStack::PushLayer</span><span class="p">(</span><span class="n">Layer</span><span class="o">*</span><span class="w"> </span><span class="n">layer</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">m_Layers</span><span class="p">.</span><span class="n">emplace</span><span class="p">(</span>
+<span class="w">        </span><span class="n">m_Layers</span><span class="p">.</span><span class="n">begin</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">m_LayerInsertIndex</span><span class="p">,</span>
+<span class="w">        </span><span class="n">layer</span><span class="p">);</span>
+<span class="w">    </span><span class="n">m_LayerInsertIndex</span><span class="o">++</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>PopLayer：</p>
+<div class="highlight"><pre><span></span><code><span class="n">m_LayerInsertIndex</span><span class="o">--</span><span class="p">;</span>
+</code></pre></div>
+
+<p>索引不会因为 vector 重新分配而失效，因此比保存迭代器更稳健。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[保存 vector iterator] --&gt; B[vector 扩容]
+    B --&gt; C[旧 iterator 失效]
+    C --&gt; D[未定义行为]
+    E[保存 unsigned index] --&gt; F[vector 扩容]
+    F --&gt; G[索引仍有效]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_24_24.png" alt="把 LayerStack 的插入迭代器改为无符号索引" loading="lazy">
+  <p class="video-caption">📷 把 LayerStack 的插入迭代器改为无符号索引<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=1464" target="_blank" rel="noopener">回到原视频 (00:24:24)</a></p>
+</div>
+
+<h2 id="11-sandbox-imgui">11. 为 Sandbox 暴露 ImGui 头文件</h2>
+<p><em>(参考时间: 00:28:00)</em></p>
+<p>Sandbox 希望直接写：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"imgui/imgui.h"</span>
+</code></pre></div>
+
+<p>因此 Premake 的 Sandbox <code>includedirs</code> 增加：</p>
+<div class="highlight"><pre><span></span><code><span class="s2">"Hazel/vendor"</span>
+</code></pre></div>
+
+<p>这样 <code>imgui/imgui.h</code> 可以从 vendor 根目录解析。</p>
+<p>重新生成项目后，Sandbox 就能声明自己的 ImGui 面板。</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[Sandbox] --&gt; B["#include imgui/imgui.h"]
+    B --&gt; C[Hazel/vendor]
+    C --&gt; D[Hazel/vendor/imgui]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_28_00.png" alt="在 Sandbox 中包含 imgui/imgui.h 并增加 vendor 路径" loading="lazy">
+  <p class="video-caption">📷 在 Sandbox 中包含 imgui/imgui.h 并增加 vendor 路径<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=1680" target="_blank" rel="noopener">回到原视频 (00:28:00)</a></p>
+</div>
+
+<h2 id="12">12. 新功能演示</h2>
+<p><em>(参考时间: 00:26:18)</em></p>
+<h3 id="121">12.1 多视口</h3>
+<p>ImGui Demo Window 可以被直接拖出主应用窗口。松开后，它变成独立窗口；拖回主窗口后重新嵌入。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_26_18.png" alt="ImGui 窗口可以拖出主应用形成独立平台窗口" loading="lazy">
+  <p class="video-caption">📷 ImGui 窗口可以拖出主应用形成独立平台窗口<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=1578" target="_blank" rel="noopener">回到原视频 (00:26:18)</a></p>
+</div>
+
+<p>还可以同时打开 Log 等窗口，并把它们放在不同显示器或不同位置。</p>
+<h3 id="122-dock-space">12.2 Dock Space</h3>
+<p>打开 <code>Examples -&gt; DockSpace</code> 后得到一个可停靠区域。把 Demo、Log、Console 拖入后，界面已经接近 Visual Studio 一类编辑器。</p>
+<p>这为 Hazel 未来直接构建关卡编辑器提供了基础。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_26_49.png" alt="通过 DockSpace 把 Log、Console 等面板组合成编辑器布局" loading="lazy">
+  <p class="video-caption">📷 通过 DockSpace 把 Log、Console 等面板组合成编辑器布局<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=1609" target="_blank" rel="noopener">回到原视频 (00:26:49)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_27_20.png" alt="Docking 与 Viewports 结合后可形成完整工作区" loading="lazy">
+  <p class="video-caption">📷 Docking 与 Viewports 结合后可形成完整工作区<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=1640" target="_blank" rel="noopener">回到原视频 (00:27:20)</a></p>
+</div>
+
+<h2 id="13-dll">13. 视频末尾的练习：DLL 符号问题</h2>
+<p><em>(参考时间: 00:29:37)</em></p>
+<p>Sandbox 加入自己的 ImGui 窗口后，编译成功，但链接阶段出现 Error：</p>
+<div class="highlight"><pre><span></span><code>unresolved external symbol ...
+ImGui::Begin
+ImGui::End
+</code></pre></div>
+
+<p>当前结构大致是：</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[ImGui 静态库] --&gt; B[Hazel.dll]
+    B --&gt; C[Sandbox.exe]
+</code></pre></div>
+
+<p>问题不在于 ImGui 没有被编译，而在于 Sandbox 直接调用的 <code>ImGui::Begin()</code>、<code>ImGui::End()</code> 等符号没有从 Hazel DLL 中导出。</p>
+<p>视频把这个问题留作作业，没有在本集给出最终修复。可选思考方向包括：</p>
+<ul>
+<li>调整导入/导出机制；</li>
+<li>调整 ImGui 与 Hazel 的链接方式；</li>
+<li>避免让 Sandbox 直接链接到未导出的 ImGui 符号。</li>
+</ul>
+<p>编者说明：这里列出的是问题分析方向，不是视频中已经确定的解决方案。实际提交在这次视频对应的 <code>7c02b786</code> 之后仍继续调整。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_29_37.png" alt="Sandbox 链接 ImGui Begin/End 时出现未解析外部符号" loading="lazy">
+  <p class="video-caption">📷 Sandbox 链接 ImGui Begin/End 时出现未解析外部符号<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22&t=1777" target="_blank" rel="noopener">回到原视频 (00:29:37)</a></p>
+</div>
+
+<h2 id="14">14. 本节结论</h2>
+<p>本讲把 Hazel 的 ImGui 集成升级为 Docking 与 Viewports：</p>
+<ul>
+<li>ImGui 子模块切换到 docking 分支；</li>
+<li>使用官方 GLFW 与 OpenGL3 后端；</li>
+<li>通过 <code>ImGuiBuild.cpp</code> 编译官方后端实现；</li>
+<li>删除自定义 ImGui 输入事件同步与 OpenGL renderer；</li>
+<li><code>ImGuiLayer</code> 改为 <code>OnAttach</code>、<code>OnDetach</code>、<code>Begin</code>、<code>End</code>、<code>OnImGuiRender</code>；</li>
+<li>启用键盘导航、Docking 和 Viewports；</li>
+<li>Application 自动创建并持有 ImGuiLayer；</li>
+<li>所有 Layer 都能通过 <code>OnImGuiRender()</code> 绘制 UI；</li>
+<li>End 阶段处理主窗口 DrawData 和浮动平台窗口；</li>
+<li>LayerStack 用索引替代易失效的迭代器；</li>
+<li>演示了多视口、Dock Space 和编辑器式布局；</li>
+<li>留下 DLL 符号导出问题作为练习。</li>
+</ul>
+<p>这次重构的重点不是增加几个界面，而是调整维护边界：Hazel 不再复制 ImGui 的内部实现，而是依赖官方后端，让上游更新可以更容易地进入引擎。</p>
+<h2 id="_2">附：参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=22">Bilibili 精译视频：022 - ImGui 停靠与视口</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/tree/7c02b7863f1d70af88b7c447b223c9da4dc9e04a">本期对应代码提交 <code>7c02b786</code></a></li>
+<li><a href="https://github.com/ocornut/imgui">Dear ImGui</a></li>
+<li><a href="https://github.com/ocornut/imgui/tree/docking">Dear ImGui Docking 分支</a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>

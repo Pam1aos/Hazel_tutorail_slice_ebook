@@ -40,6 +40,10 @@
   - [Markdown 版本](<Hazel Game Engine/020 - Key and Mouse Codes/book.md>)
   - 视频来源：[Bilibili 精译版第 20 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=20)
   - 主题：Hazel 键码与鼠标码、GLFW 常量隔离、Hazel.h 公共接口、轮询与事件比较和跨后端转换策略
+- [022 - ImGui Docking and Viewports](<Hazel Game Engine/022 - ImGui Docking and Viewports/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/022 - ImGui Docking and Viewports/book.md>)
+  - 视频来源：[Bilibili 精译版第 22 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=22)
+  - 主题：ImGui docking 分支、官方 GLFW/OpenGL3 后端、Docking 与多视口、`OnImGuiRender` 和 LayerStack 索引修复
 
 ## 南京大学操作系统原理 2026
 
