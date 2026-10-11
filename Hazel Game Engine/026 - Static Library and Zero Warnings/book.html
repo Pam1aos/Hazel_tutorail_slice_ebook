@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 026：静态库与零警告</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: #f3f4f6; font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+            code { overflow-wrap: anywhere; word-break: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-026">Hazel 游戏引擎笔记 026：静态库与零警告</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=26">The Cherno 游戏引擎系列第 26 讲“静态库和零警告”</a>，时长约 22 分 51 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。代码参考提交：<a href="https://github.com/TheCherno/Hazel/tree/440d937a"><code>440d937a</code></a>。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材；术语和代码以原视频及同期 Hazel 仓库为准。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>上一讲决定把 Hazel 从动态库改成静态库。本讲实际执行转换，并把整个解决方案的警告降到零。</p>
+<p>主要任务：</p>
+<ul>
+<li>把 Hazel 的项目类型从 <code>SharedLib</code> 改为 <code>StaticLib</code>；</li>
+<li>在所有依赖项目中启用静态 Runtime；</li>
+<li>移除复制 DLL 的后构建步骤；</li>
+<li>让 <code>HAZEL_API</code> 在静态链接时变为空；</li>
+<li>统一 Debug / Release / Dist 的 Runtime 配置；</li>
+<li>处理 ImGui 使用旧 CRT 函数产生的警告；</li>
+<li>处理跨 DLL 边界的 shared_ptr 和模板警告；</li>
+<li>实现零警告构建；</li>
+<li>验证 Sandbox 仍能正常运行。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Shared Library] --&gt; B[Static Runtime]
+    B --&gt; C[Static Library]
+    C --&gt; D[清理导出宏]
+    D --&gt; E[修复 CRT 警告]
+    E --&gt; F[修复类型转换警告]
+    F --&gt; G[零警告构建]
+    G --&gt; H[验证 Sandbox]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_01_05.png" alt="把 Hazel 从动态库转换为静态库，并让构建达到零警告" loading="lazy">
+  <p class="video-caption">📷 把 Hazel 从动态库转换为静态库，并让构建达到零警告<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=26&t=65" target="_blank" rel="noopener">回到原视频 (00:01:05)</a></p>
+</div>
+
+<h2 id="1">1. 转换前的警告状态</h2>
+<p><em>(参考时间: 00:03:32)</em></p>
+<p>清理后重新构建，会看到多种警告。</p>
+<h3 id="11-dll">1.1 DLL 边界警告</h3>
+<p><code>std::shared_ptr</code>、模板类型和 STL 类型跨越 DLL 边界时，会产生类似警告：</p>
+<div class="highlight"><pre><span></span><code>needs to have dll-interface to be used by clients
+</code></pre></div>
+
+<p>这些警告不一定意味着代码立即出错，但说明 DLL 边界正在让类型系统与 ABI 变得复杂。</p>
+<h3 id="12-runtime">1.2 Runtime 冲突</h3>
+<p>不同静态库或 DLL 可能链接不同版本的 C++ Runtime，从而产生默认库冲突：</p>
+<div class="highlight"><pre><span></span><code>conflicts with use of other libs
+</code></pre></div>
+
+<p>Debug Runtime 和 Release Runtime 的内存分配方式可能不同。如果某个模块用 Debug Runtime 分配内存，再由 Release Runtime 释放，可能导致崩溃或内存破坏。</p>
+<h3 id="13-crt">1.3 CRT 弃用警告</h3>
+<p>ImGui 示例代码中使用了：</p>
+<div class="highlight"><pre><span></span><code><span class="n">strcpy</span>
+<span class="n">sprintf</span>
+</code></pre></div>
+
+<p>这类旧 CRT 函数，编译器会建议使用带缓冲区大小的安全版本，例如 <code>strcpy_s</code>、<code>sprintf_s</code>。</p>
+<p>ImGui 是第三方代码，因此 Hazel 不应直接大面积修改它，而是考虑在构建 ImGui 的翻译单元中抑制警告。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[构建警告] --&gt; B[DLL 边界]
+    A --&gt; C[Runtime 版本冲突]
+    A --&gt; D[旧 CRT 函数]
+    A --&gt; E[参数类型转换]
+    B --&gt; F[转为静态库后消失]
+    C --&gt; F
+    D --&gt; G[局部或项目级宏]
+    E --&gt; H[显式 cast]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_03_52.png" alt="转换前存在 DLL 边界、Runtime 冲突和旧 CRT 函数等警告" loading="lazy">
+  <p class="video-caption">📷 转换前存在 DLL 边界、Runtime 冲突和旧 CRT 函数等警告<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=26&t=232" target="_blank" rel="noopener">回到原视频 (00:03:52)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_04_33.png" alt="std::shared_ptr 与模板跨 DLL 边界产生大量警告" loading="lazy">
+  <p class="video-caption">📷 std::shared_ptr 与模板跨 DLL 边界产生大量警告<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=26&t=273" target="_blank" rel="noopener">回到原视频 (00:04:33)</a></p>
+</div>
+
+<h2 id="2-premake-hazel">2. Premake：把 Hazel 改为静态库</h2>
+<p><em>(参考时间: 00:06:30)</em></p>
+<p>原配置：</p>
+<div class="highlight"><pre><span></span><code><span class="nv">project</span><span class="w"> </span><span class="s2">"Hazel"</span>
+<span class="w">    </span><span class="nv">kind</span><span class="w"> </span><span class="s2">"SharedLib"</span>
+<span class="w">    </span><span class="nv">staticruntime</span><span class="w"> </span><span class="s2">"off"</span>
+</code></pre></div>
+
+<p>新配置：</p>
+<div class="highlight"><pre><span></span><code><span class="nv">project</span><span class="w"> </span><span class="s2">"Hazel"</span>
+<span class="w">    </span><span class="nv">kind</span><span class="w"> </span><span class="s2">"StaticLib"</span>
+<span class="w">    </span><span class="nv">language</span><span class="w"> </span><span class="s2">"C++"</span>
+<span class="w">    </span><span class="nv">cppdialect</span><span class="w"> </span><span class="s2">"C++17"</span>
+<span class="w">    </span><span class="nv">staticruntime</span><span class="w"> </span><span class="s2">"on"</span>
+</code></pre></div>
+
+<p>核心就是把 <code>SharedLib</code> 改为 <code>StaticLib</code>，并启用静态 Runtime。</p>
+<h3 id="21-runtime">2.1 为什么静态库应使用静态 Runtime</h3>
+<p>DLL 是独立最终模块，需要自带 Runtime 实现。不同 DLL 可能使用：</p>
+<ul>
+<li>Debug Runtime；</li>
+<li>Release Runtime；</li>
+<li>不同版本或不同配置的 CRT。</li>
+</ul>
+<p>静态库最终会进入同一个 EXE 链接过程，因此更适合同样使用静态 Runtime：</p>
+<div class="highlight"><pre><span></span><code>Hazel.lib + ImGui.lib + GLFW.lib + Glad.lib
+  -&gt; Sandbox.exe
+  -&gt; 单一 Runtime
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[多个 DLL] --&gt; B[每个模块可能链接自己的 Runtime]
+    B --&gt; C[版本/配置不一致]
+    C --&gt; D[跨边界分配/释放风险]
+    E[多个静态库] --&gt; F[最终统一链接进 EXE]
+    F --&gt; G[单一 Runtime]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_06_30.png" alt="Hazel 改为 StaticLib 并启用 staticruntime" loading="lazy">
+  <p class="video-caption">📷 Hazel 改为 StaticLib 并启用 staticruntime<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=26&t=390" target="_blank" rel="noopener">回到原视频 (00:06:30)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_07_02.png" alt="静态 Runtime 让最终可执行文件使用统一的 C++ Runtime" loading="lazy">
+  <p class="video-caption">📷 静态 Runtime 让最终可执行文件使用统一的 C++ Runtime<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=26&t=422" target="_blank" rel="noopener">回到原视频 (00:07:02)</a></p>
+</div>
+
+<h2 id="3-premake">3. 清理 Premake 配置</h2>
+<p><em>(参考时间: 00:08:04)</em></p>
+<h3 id="31">3.1 移动通用设置</h3>
+<p><code>cppdialect</code> 不只是 Windows 设置，因此从 <code>filter "system:windows"</code> 移到项目通用设置。</p>
+<h3 id="32-dll">3.2 删除 DLL 复制步骤</h3>
+<p>原后构建命令用于复制 Hazel DLL 到 Sandbox：</p>
+<div class="highlight"><pre><span></span><code><span class="nv">postbuildcommands</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="s2">"{COPY} ... Hazel.dll ... Sandbox/"</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>静态库不再生成 <code>Hazel.dll</code>，因此后构建复制步骤应删除。</p>
+<h3 id="33">3.3 统一配置写法</h3>
+<div class="highlight"><pre><span></span><code><span class="nv">filter</span><span class="w"> </span><span class="s2">"configurations:Debug"</span>
+<span class="w">    </span><span class="nv">defines</span><span class="w"> </span><span class="s2">"HZ_DEBUG"</span>
+<span class="w">    </span><span class="nv">runtime</span><span class="w"> </span><span class="s2">"Debug"</span>
+<span class="w">    </span><span class="nv">symbols</span><span class="w"> </span><span class="s2">"on"</span>
+
+<span class="nv">filter</span><span class="w"> </span><span class="s2">"configurations:Release"</span>
+<span class="w">    </span><span class="nv">defines</span><span class="w"> </span><span class="s2">"HZ_RELEASE"</span>
+<span class="w">    </span><span class="nv">runtime</span><span class="w"> </span><span class="s2">"Release"</span>
+<span class="w">    </span><span class="nv">optimize</span><span class="w"> </span><span class="s2">"on"</span>
+
+<span class="nv">filter</span><span class="w"> </span><span class="s2">"configurations:Dist"</span>
+<span class="w">    </span><span class="nv">defines</span><span class="w"> </span><span class="s2">"HZ_DIST"</span>
+<span class="w">    </span><span class="nv">runtime</span><span class="w"> </span><span class="s2">"Release"</span>
+<span class="w">    </span><span class="nv">optimize</span><span class="w"> </span><span class="s2">"on"</span>
+</code></pre></div>
+
+<p>配置设计：</p>
+<table>
+<thead>
+<tr>
+<th>配置</th>
+<th>Runtime</th>
+<th>符号</th>
+<th>优化</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Debug</td>
+<td>Debug</td>
+<td>On</td>
+<td>Off</td>
+</tr>
+<tr>
+<td>Release</td>
+<td>Release</td>
+<td>Off</td>
+<td>On</td>
+</tr>
+<tr>
+<td>Dist</td>
+<td>Release</td>
+<td>Off</td>
+<td>On</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[Debug] --&gt; B[Runtime Debug + symbols on]
+    C[Release] --&gt; D[Runtime Release + optimize on]
+    E[Dist] --&gt; F[Runtime Release + optimize on]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_08_04.png" alt="移除 DLL 后构建步骤，并按 Premake 文档统一配置" loading="lazy">
+  <p class="video-caption">📷 移除 DLL 后构建步骤，并按 Premake 文档统一配置<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=26&t=484" target="_blank" rel="noopener">回到原视频 (00:08:04)</a></p>
+</div>
+
+<h2 id="4-premake">4. 同步依赖项目的 Premake</h2>
+<p><em>(参考时间: 00:09:47)</em></p>
+<p>依赖项目也需要统一 Runtime 配置：</p>
+<ul>
+<li>GLFW；</li>
+<li>Glad；</li>
+<li>ImGui。</li>
+</ul>
+<h3 id="41-glfw">4.1 GLFW</h3>
+<ul>
+<li>保持 <code>StaticLib</code>；</li>
+<li><code>staticruntime "on"</code>；</li>
+<li>只保留 Debug / Release；</li>
+<li>Debug 生成符号；</li>
+<li>Release 开启优化；</li>
+<li>删除无意义的 Windows 编译参数。</li>
+</ul>
+<h3 id="42-glad">4.2 Glad</h3>
+<p>Glad 同样是 C 静态库：</p>
+<div class="highlight"><pre><span></span><code><span class="nv">project</span><span class="w"> </span><span class="s2">"Glad"</span>
+<span class="w">    </span><span class="nv">kind</span><span class="w"> </span><span class="s2">"StaticLib"</span>
+<span class="w">    </span><span class="nv">language</span><span class="w"> </span><span class="s2">"C"</span>
+<span class="w">    </span><span class="nv">staticruntime</span><span class="w"> </span><span class="s2">"on"</span>
+</code></pre></div>
+
+<p>并为 Debug / Release 分别设置 runtime、symbols 和 optimize。</p>
+<h3 id="43-imgui">4.3 ImGui</h3>
+<p>ImGui 也改为静态 Runtime，并统一 C++17 与静态链接设置。</p>
+<p>所有依赖最终都必须使用相同的 Runtime 选择，否则链接冲突仍可能出现。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[统一静态 Runtime] --&gt; B[GLFW]
+    A --&gt; C[Glad]
+    A --&gt; D[ImGui]
+    A --&gt; E[Hazel]
+    B --&gt; F[Sandbox.exe]
+    C --&gt; F
+    D --&gt; F
+    E --&gt; F
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_09_47.png" alt="GLFW、Glad 和 ImGui 的 Premake 配置统一使用静态 Runtime" loading="lazy">
+  <p class="video-caption">📷 GLFW、Glad 和 ImGui 的 Premake 配置统一使用静态 Runtime<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=26&t=587" target="_blank" rel="noopener">回到原视频 (00:09:47)</a></p>
+</div>
+
+<h2 id="5">5. 重新生成与验证静态库</h2>
+<p><em>(参考时间: 00:14:00)</em></p>
+<p>执行：</p>
+<div class="highlight"><pre><span></span><code>GenerateProjects.bat
+</code></pre></div>
+
+<p>回到 Visual Studio 后重新加载解决方案，确认 Hazel 的配置类型已经从：</p>
+<div class="highlight"><pre><span></span><code>DynamicLibrary
+</code></pre></div>
+
+<p>变为：</p>
+<div class="highlight"><pre><span></span><code>StaticLibrary
+</code></pre></div>
+
+<p>接着执行“超干净构建”：</p>
+<ol>
+<li>删除 <code>bin</code>；</li>
+<li>删除 <code>bin-int</code>；</li>
+<li>重新生成工程；</li>
+<li>重新构建整个解决方案。</li>
+</ol>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[运行 Premake] --&gt; B[重新加载 VS 工程]
+    B --&gt; C{Hazel 是 StaticLibrary?}
+    C -- 否 --&gt; D[检查 Premake]
+    C -- 是 --&gt; E[删除 bin / bin-int]
+    E --&gt; F[重新构建]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_14_00.png" alt="重新生成项目后 Hazel 显示为 StaticLibrary" loading="lazy">
+  <p class="video-caption">📷 重新生成项目后 Hazel 显示为 StaticLibrary<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=26&t=840" target="_blank" rel="noopener">回到原视频 (00:14:00)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_14_20.png" alt="删除 bin 与 bin-int 后进行超干净构建" loading="lazy">
+  <p class="video-caption">📷 删除 bin 与 bin-int 后进行超干净构建<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=26&t=860" target="_blank" rel="noopener">回到原视频 (00:14:20)</a></p>
+</div>
+
+<h2 id="6-coreh">6. Core.h：动态链接与静态链接兼容</h2>
+<p><em>(参考时间: 00:15:00)</em></p>
+<p>旧代码始终根据 <code>HZ_BUILD_DLL</code> 选择导入或导出：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#ifdef HZ_BUILD_DLL</span>
+<span class="w">    </span><span class="cp">#define HAZEL_API __declspec(dllexport)</span>
+<span class="cp">#else</span>
+<span class="w">    </span><span class="cp">#define HAZEL_API __declspec(dllimport)</span>
+<span class="cp">#endif</span>
+</code></pre></div>
+
+<p>静态库不需要这些属性。新增 <code>HZ_DYNAMIC_LINK</code> 条件：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#ifdef HZ_PLATFORM_WINDOWS</span>
+<span class="w">    </span><span class="cp">#if HZ_DYNAMIC_LINK</span>
+<span class="w">        </span><span class="cp">#ifdef HZ_BUILD_DLL</span>
+<span class="w">            </span><span class="cp">#define HAZEL_API __declspec(dllexport)</span>
+<span class="w">        </span><span class="cp">#else</span>
+<span class="w">            </span><span class="cp">#define HAZEL_API __declspec(dllimport)</span>
+<span class="w">        </span><span class="cp">#endif</span>
+<span class="w">    </span><span class="cp">#else</span>
+<span class="w">        </span><span class="cp">#define HAZEL_API</span>
+<span class="w">    </span><span class="cp">#endif</span>
+<span class="cp">#else</span>
+<span class="w">    </span><span class="cp">#error Hazel only supports Windows!</span>
+<span class="cp">#endif</span>
+</code></pre></div>
+
+<p>当 <code>HZ_DYNAMIC_LINK</code> 没有定义时，<code>HAZEL_API</code> 展开为空，因此类声明不再需要导入导出语义。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[HAZEL_API] --&gt; B{HZ_DYNAMIC_LINK}
+    B -- 是 --&gt; C[dllexport / dllimport]
+    B -- 否 --&gt; D[空宏]
+    D --&gt; E[静态库无需导出属性]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_15_00.png" alt="在 Core.h 中用 HZ_DYNAMIC_LINK 控制导出宏" loading="lazy">
+  <p class="video-caption">📷 在 Core.h 中用 HZ_DYNAMIC_LINK 控制导出宏<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=26&t=900" target="_blank" rel="noopener">回到原视频 (00:15:00)</a></p>
+</div>
+
+<h3 id="61-hazel_api">6.1 为什么不直接删除 HAZEL_API</h3>
+<p>未来仍然可能出现动态加载的模块，例如：</p>
+<ul>
+<li>游戏代码 DLL；</li>
+<li>编辑器模块；</li>
+<li>热替换插件。</li>
+</ul>
+<p>静态 Hazel 核心库与“动态游戏模块”并不冲突。保留 <code>HZ_DYNAMIC_LINK</code> 开关，可以避免当前阶段进行大规模全项目搜索替换。</p>
+<h2 id="7">7. 修复剩余警告</h2>
+<p><em>(参考时间: 00:16:10)</em></p>
+<h3 id="71">7.1 整数到浮点转换</h3>
+<p>ImGuiLayer 把窗口宽高从 <code>unsigned int</code> 转成 <code>float</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="n">io</span><span class="p">.</span><span class="n">DisplaySize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ImVec2</span><span class="p">(</span>
+<span class="w">    </span><span class="p">(</span><span class="kt">float</span><span class="p">)</span><span class="n">app</span><span class="p">.</span><span class="n">GetWindow</span><span class="p">().</span><span class="n">GetWidth</span><span class="p">(),</span>
+<span class="w">    </span><span class="p">(</span><span class="kt">float</span><span class="p">)</span><span class="n">app</span><span class="p">.</span><span class="n">GetWindow</span><span class="p">().</span><span class="n">GetHeight</span><span class="p">());</span>
+</code></pre></div>
+
+<p>显式 cast 清楚表达这是有意转换，也消除 C++ 警告。</p>
+<h3 id="72-crt">7.2 第三方 CRT 弃用函数</h3>
+<p>ImGui 的 OpenGL3 示例使用 <code>strcpy</code>、<code>sprintf</code> 等旧函数。Hazel 不想修改第三方代码，因此可以定义：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#define _CRT_SECURE_NO_WARNINGS</span>
+</code></pre></div>
+
+<p>第一次尝试把宏放在 <code>ImGuiBuild.cpp</code> 中，但由于预编译头已经包含 <code>string.h</code>，弃用属性在宏生效前就已经出现，警告没有完全消失。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[在 ImGuiBuild.cpp 定义宏] --&gt; B[预编译头先包含 string.h]
+    B --&gt; C[弃用函数声明已进入编译]
+    C --&gt; D[警告仍然存在]
+    D --&gt; E[改为项目级定义]
+</code></pre></div>
+
+<p>最后把 <code>_CRT_SECURE_NO_WARNINGS</code> 放到 Hazel 项目的通用定义中：</p>
+<div class="highlight"><pre><span></span><code><span class="nv">defines</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="s2">"_CRT_SECURE_NO_WARNINGS"</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这会让整个 Hazel 项目都不再报告这些 CRT 弃用警告。视频承认这不是最细粒度方案，但能保持第三方代码不改动。</p>
+<p>编者说明：如果这些函数出现在 Hazel 自有代码中，更合理的做法通常是改用带边界检查的安全版本；本项目的宏主要是为第三方 ImGui 代码服务。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_17_55.png" alt="先尝试只对 ImGuiBuild.cpp 局部抑制 CRT 警告" loading="lazy">
+  <p class="video-caption">📷 先尝试只对 ImGuiBuild.cpp 局部抑制 CRT 警告<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=26&t=1075" target="_blank" rel="noopener">回到原视频 (00:17:55)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_20_40.png" alt="由于 PCH 已包含 string.h，最终改为项目级 CRT 警告宏" loading="lazy">
+  <p class="video-caption">📷 由于 PCH 已包含 string.h，最终改为项目级 CRT 警告宏<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=26&t=1240" target="_blank" rel="noopener">回到原视频 (00:20:40)</a></p>
+</div>
+
+<h2 id="8">8. 零警告构建</h2>
+<p><em>(参考时间: 00:21:16)</em></p>
+<p>再次清理并构建后：</p>
+<div class="highlight"><pre><span></span><code>Build succeeded
+0 Errors
+0 Warnings
+</code></pre></div>
+
+<p>Sandbox 启动后仍能正常工作，说明静态库转换没有破坏原功能。</p>
+<p>视频还提到可以选择打开“Treat Warnings as Errors”，但担心后期开发中被临时警告阻塞，因此当前没有启用。</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[静态库] --&gt; B[统一 Runtime]
+    B --&gt; C[清理 DLL 边界]
+    C --&gt; D[修复显式转换]
+    D --&gt; E[处理 CRT 警告]
+    E --&gt; F[0 Errors / 0 Warnings]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_21_16.png" alt="最终构建成功，错误和警告均为零" loading="lazy">
+  <p class="video-caption">📷 最终构建成功，错误和警告均为零<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=26&t=1276" target="_blank" rel="noopener">回到原视频 (00:21:16)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_21_21.png" alt="零警告构建后 Sandbox 仍可正常运行" loading="lazy">
+  <p class="video-caption">📷 零警告构建后 Sandbox 仍可正常运行<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=26&t=1281" target="_blank" rel="noopener">回到原视频 (00:21:21)</a></p>
+</div>
+
+<h2 id="9">9. 本节结论</h2>
+<p>本讲完成了 Hazel 架构的一次重要简化：</p>
+<ul>
+<li>把 Hazel 从 <code>SharedLib</code> 改为 <code>StaticLib</code>；</li>
+<li>在 Hazel、GLFW、Glad、ImGui 中统一启用静态 Runtime；</li>
+<li>删除复制 DLL 的后构建步骤；</li>
+<li>简化 Premake 与 Visual Studio 工程配置；</li>
+<li>用 <code>HZ_DYNAMIC_LINK</code> 控制 <code>HAZEL_API</code>；</li>
+<li>静态构建时让导出宏变为空；</li>
+<li>修复整数到浮点转换警告；</li>
+<li>解决 ImGui 旧 CRT 函数的弃用警告；</li>
+<li>通过超干净构建得到零错误、零警告；</li>
+<li>保留未来动态加载游戏模块或插件的可能。</li>
+</ul>
+<p>静态链接让 Hazel 核心库更简单、更统一，也为后续 RendererAPI 类的大量新增代码减少了 DLL 边界负担。</p>
+<p>下一阶段将在这个干净的构建基础上正式开始 OpenGL Render Context、Swap Chain 和第一个渲染结果。</p>
+<h2 id="_2">附：参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=26">Bilibili 精译视频：026 - 静态库和零警告</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/tree/440d937a">本期对应代码提交 <code>440d937a</code></a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>

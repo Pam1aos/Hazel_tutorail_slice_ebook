@@ -56,6 +56,10 @@
   - [Markdown 版本](<Hazel Game Engine/025 - Rendering and Maintenance/book.md>)
   - 视频来源：[Bilibili 精译版第 25 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=25)
   - 主题：ImGui DLL 符号问题、`.def` 导出、静态库决策、热重载边界和渲染阶段规划
+- [026 - Static Library and Zero Warnings](<Hazel Game Engine/026 - Static Library and Zero Warnings/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/026 - Static Library and Zero Warnings/book.md>)
+  - 视频来源：[Bilibili 精译版第 26 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=26)
+  - 主题：Hazel 静态库转换、统一静态 Runtime、`HZ_DYNAMIC_LINK`、CRT/PCH 警告处理和零警告构建
 
 ## 南京大学操作系统原理 2026
 
