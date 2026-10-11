@@ -32,6 +32,10 @@
   - [Markdown 版本](<Hazel Game Engine/018 - Pull Requests/book.md>)
   - 视频来源：[Bilibili 精译版第 18 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=18)
   - 主题：PR 审查与讨论、分支冲突、本地同步、Premake `startproject`、首次构建失败修复和贡献流程
+- [019 - Input Polling](<Hazel Game Engine/019 - Input Polling/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/019 - Input Polling/book.md>)
+  - 视频来源：[Bilibili 精译版第 19 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=19)
+  - 主题：事件与输入轮询、`Input` 静态接口、`WindowsInput`、`GetNativeWindow`、键盘鼠标查询和 Input 单例
 
 ## 南京大学操作系统原理 2026
 

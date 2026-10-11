@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 019：实现输入轮询</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: #f3f4f6; font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+            code { overflow-wrap: anywhere; word-break: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-019">Hazel 游戏引擎笔记 019：实现输入轮询</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=19">The Cherno 游戏引擎系列第 19 讲“输入轮询”</a>，时长约 25 分 40 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。代码参考提交：<a href="https://github.com/TheCherno/Hazel/tree/e1bb18d2c8e9c514d959c2eeb55d24af00d169ff"><code>e1bb18d2</code></a>。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材；术语和代码以原视频及同期 Hazel 仓库为准。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>Hazel 已经拥有事件系统：按键、鼠标移动或窗口变化发生时，Layer 会收到事件通知。但事件系统只回答“刚刚发生了什么”，无法回答“现在是否仍处于按下状态”。</p>
+<p>本讲要补上另一套输入模型：<strong>轮询（polling）</strong>。客户端代码可以在任意时刻主动询问：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Input</span><span class="o">::</span><span class="n">IsKeyPressed</span><span class="p">(</span><span class="n">keycode</span><span class="p">);</span>
+<span class="n">Input</span><span class="o">::</span><span class="n">IsMouseButtonPressed</span><span class="p">(</span><span class="n">button</span><span class="p">);</span>
+<span class="n">Input</span><span class="o">::</span><span class="n">GetMousePosition</span><span class="p">();</span>
+</code></pre></div>
+
+<p>两种输入模型并不是互相替代，而是分别解决不同问题：</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[输入发生] --&gt; B[事件系统]
+    B --&gt; C[通知 Layer 刚刚发生了什么]
+    A --&gt; D[输入轮询]
+    D --&gt; E[随时查询当前状态]
+    C --&gt; F[触发一次动作]
+    E --&gt; G[持续行为与组合条件]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_00_18.png" alt="事件系统负责通知，输入轮询负责查询当前状态" loading="lazy">
+  <p class="video-caption">📷 事件系统负责通知，输入轮询负责查询当前状态<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=19&t=18" target="_blank" rel="noopener">回到原视频 (00:00:18)</a></p>
+</div>
+
+<h2 id="1">1. 为什么需要轮询</h2>
+<p><em>(参考时间: 00:01:04)</em></p>
+<p>以 Maya 风格的相机控制为例，用户可能按住 Alt，再按住鼠标左键并移动鼠标。鼠标移动事件本身只提供坐标，控制器还需要同时判断：</p>
+<div class="highlight"><pre><span></span><code>Alt 当前是否按下？
+鼠标左键当前是否按下？
+</code></pre></div>
+
+<p>如果两者都成立，这次鼠标移动才应该旋转相机。</p>
+<p>客户端完全可以在自己的 Layer 中维护这些状态：</p>
+<ul>
+<li>收到鼠标按下事件时把状态设为 <code>true</code>；</li>
+<li>收到鼠标释放事件时把状态设为 <code>false</code>；</li>
+<li>每次动作再读取自己保存的布尔值。</li>
+</ul>
+<p>但这意味着每个客户端都要重复实现同一套状态维护。更合理的做法是由 Hazel 统一保存和查询平台输入状态，并向所有客户端提供一致的输入 API。</p>
+<h2 id="2-input">2. 设计 Input 接口</h2>
+<p><em>(参考时间: 00:02:51)</em></p>
+<p>Input 与 Window 的设计方式相近，但有一个重要差异：</p>
+<ul>
+<li>Window 将来可能有多个实例；</li>
+<li>Input 在本阶段设计为全局管理器，只有一个实例。</li>
+</ul>
+<p>因此 <code>Input</code> 类本身只提供静态查询函数，具体行为由平台实现类完成。新增头文件：</p>
+<div class="highlight"><pre><span></span><code>Hazel/src/Hazel/Input.h
+</code></pre></div>
+
+<p>接口内容如下：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HAZEL_API</span><span class="w"> </span><span class="n">Input</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">IsKeyPressed</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">keycode</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">s_Instance</span><span class="o">-&gt;</span><span class="n">IsKeyPressedImpl</span><span class="p">(</span><span class="n">keycode</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">IsMouseButtonPressed</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">button</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">s_Instance</span><span class="o">-&gt;</span><span class="n">IsMouseButtonPressedImpl</span><span class="p">(</span><span class="n">button</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">pair</span><span class="o">&lt;</span><span class="kt">float</span><span class="p">,</span><span class="w"> </span><span class="kt">float</span><span class="o">&gt;</span><span class="w"> </span><span class="n">GetMousePosition</span><span class="p">()</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">s_Instance</span><span class="o">-&gt;</span><span class="n">GetMousePositionImpl</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">GetMouseX</span><span class="p">()</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">s_Instance</span><span class="o">-&gt;</span><span class="n">GetMouseXImpl</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">GetMouseY</span><span class="p">()</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">s_Instance</span><span class="o">-&gt;</span><span class="n">GetMouseYImpl</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="k">protected</span><span class="o">:</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">IsKeyPressedImpl</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">keycode</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="nf">IsMouseButtonPressedImpl</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">button</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">pair</span><span class="o">&lt;</span><span class="kt">float</span><span class="p">,</span><span class="w"> </span><span class="kt">float</span><span class="o">&gt;</span><span class="w"> </span><span class="n">GetMousePositionImpl</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="nf">GetMouseXImpl</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="nf">GetMouseYImpl</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="n">Input</span><span class="o">*</span><span class="w"> </span><span class="n">s_Instance</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<h3 id="21">2.1 静态外观与虚函数实现</h3>
+<p>调用者只需要写：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Input</span><span class="o">::</span><span class="n">IsKeyPressed</span><span class="p">(</span><span class="n">keycode</span><span class="p">)</span>
+</code></pre></div>
+
+<p>静态函数随后转发给 <code>s_Instance</code>。<code>s_Instance</code> 的实际类型是平台子类，例如 <code>WindowsInput</code>。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant C as Client
+    participant I as Input
+    participant W as WindowsInput
+    participant G as GLFW
+
+    C-&gt;&gt;I: IsKeyPressed(keycode)
+    I-&gt;&gt;W: IsKeyPressedImpl(keycode)
+    W-&gt;&gt;G: glfwGetKey(window, keycode)
+    G--&gt;&gt;W: GLFW_PRESS / RELEASE / REPEAT
+    W--&gt;&gt;I: bool
+    I--&gt;&gt;C: bool
+</code></pre></div>
+
+<p>这种结构把“客户端看到什么 API”和“某个平台如何实现”隔开了。</p>
+<p><code>s_Instance</code> 是静态成员，它不属于任何一个 <code>Input</code> 对象。<code>Input</code> 本身因此没有实例数据，只是全局入口和平台接口。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_06_06.png" alt="在 Input.h 中定义静态查询接口和平台实现虚函数" loading="lazy">
+  <p class="video-caption">📷 在 Input.h 中定义静态查询接口和平台实现虚函数<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=19&t=366" target="_blank" rel="noopener">回到原视频 (00:06:06)</a></p>
+</div>
+
+<h2 id="3-windowsinput">3. 创建 WindowsInput</h2>
+<p><em>(参考时间: 00:07:32)</em></p>
+<p>平台实现放在：</p>
+<div class="highlight"><pre><span></span><code>Hazel/src/Platform/Windows/WindowsInput.h
+Hazel/src/Platform/Windows/WindowsInput.cpp
+</code></pre></div>
+
+<p>头文件继承 <code>Input</code> 并覆盖所有 <code>Impl</code> 函数：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">WindowsInput</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">Input</span>
+<span class="p">{</span>
+<span class="k">protected</span><span class="o">:</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">IsKeyPressedImpl</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">keycode</span><span class="p">)</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="nf">IsMouseButtonPressedImpl</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">button</span><span class="p">)</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">pair</span><span class="o">&lt;</span><span class="kt">float</span><span class="p">,</span><span class="w"> </span><span class="kt">float</span><span class="o">&gt;</span><span class="w"> </span><span class="n">GetMousePositionImpl</span><span class="p">()</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="nf">GetMouseXImpl</span><span class="p">()</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="nf">GetMouseYImpl</span><span class="p">()</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>这里仍使用 GLFW 键码，但 GLFW 只出现在 Windows 平台实现中，没有进入通用 <code>Input</code> 接口。</p>
+<p>新增 <code>.cpp</code> 文件后需要重新生成 Visual Studio 工程，以确保新实现被加入项目并参与编译。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_07_32.png" alt="新增 WindowsInput 平台实现类" loading="lazy">
+  <p class="video-caption">📷 新增 WindowsInput 平台实现类<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=19&t=452" target="_blank" rel="noopener">回到原视频 (00:07:32)</a></p>
+</div>
+
+<h2 id="4">4. 暴露原生窗口</h2>
+<p><em>(参考时间: 00:09:45)</em></p>
+<p>GLFW 输入函数需要 <code>GLFWwindow*</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glfwGetKey</span><span class="p">(</span><span class="n">GLFWwindow</span><span class="o">*</span><span class="w"> </span><span class="n">window</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">key</span><span class="p">);</span>
+</code></pre></div>
+
+<p>但 <code>Window</code> 抽象层不能直接暴露 <code>GLFWwindow</code> 类型，否则 Hazel 的公开接口又会绑定到 GLFW。</p>
+<p>可选方案包括：</p>
+<ol>
+<li>把 <code>m_Window</code> 设为 public；</li>
+<li>让 <code>WindowsInput</code> 成为 <code>WindowsWindow</code> 的 friend；</li>
+<li>在 <code>Window</code> 接口中提供通用的原生窗口句柄。</li>
+</ol>
+<p>第一种方案破坏封装；第二种虽然可行，但限制较多。本讲选择第三种方案。</p>
+<h3 id="41-window">4.1 Window 接口</h3>
+<div class="highlight"><pre><span></span><code><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">GetNativeWindow</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+</code></pre></div>
+
+<p>返回类型使用 <code>void*</code>，因为不同平台和不同窗口库可能返回不同类型的原生句柄：</p>
+<ul>
+<li>Windows 可能返回 <code>GLFWwindow*</code>；</li>
+<li>其它平台可能返回 HWND、X11 Window 或平台封装对象。</li>
+</ul>
+<h3 id="42-windowswindow">4.2 WindowsWindow 实现</h3>
+<div class="highlight"><pre><span></span><code><span class="kr">inline</span><span class="w"> </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">GetNativeWindow</span><span class="p">()</span><span class="w"> </span><span class="k">const</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">m_Window</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><code>m_Window</code> 的实际类型是 <code>GLFWwindow*</code>，返回时会隐式转换成 <code>void*</code>。</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[WindowsInput] --&gt; B[Application::Get]
+    B --&gt; C[GetWindow]
+    C --&gt; D[Window::GetNativeWindow]
+    D --&gt; E["void* 原生句柄"]
+    E --&gt; F["static_cast&lt;GLFWwindow*&gt;"]
+    F --&gt; G[glfwGetKey / Mouse / CursorPos]
+</code></pre></div>
+
+<h3 id="43-virtual">4.3 为什么覆盖函数继续写 virtual</h3>
+<p>基类中的函数只要声明为 <code>virtual</code>，派生类覆盖后仍然是虚函数。即使派生类不重复写 <code>virtual</code>，运行时多态也不会消失。</p>
+<p>继续写 <code>virtual</code> 不是语言要求，而是可读性选择：它明确提醒读者这里仍在参与虚函数链。<code>override</code> 则更有实际价值，因为函数签名写错时会直接产生编译错误。</p>
+<p>编者说明：这只是编码风格取舍，不是 C++ 语义上的必需写法。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_11_03.png" alt="Window 接口增加 GetNativeWindow，WindowsWindow 返回 GLFW 窗口" loading="lazy">
+  <p class="video-caption">📷 Window 接口增加 GetNativeWindow，WindowsWindow 返回 GLFW 窗口<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=19&t=663" target="_blank" rel="noopener">回到原视频 (00:11:03)</a></p>
+</div>
+
+<h2 id="5">5. 实现键盘轮询</h2>
+<p><em>(参考时间: 00:13:24)</em></p>
+<div class="highlight"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">WindowsInput::IsKeyPressedImpl</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">keycode</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">window</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">GLFWwindow</span><span class="o">*&gt;</span><span class="p">(</span>
+<span class="w">        </span><span class="n">Application</span><span class="o">::</span><span class="n">Get</span><span class="p">()</span>
+<span class="w">            </span><span class="p">.</span><span class="n">GetWindow</span><span class="p">()</span>
+<span class="w">            </span><span class="p">.</span><span class="n">GetNativeWindow</span><span class="p">());</span>
+
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">glfwGetKey</span><span class="p">(</span><span class="n">window</span><span class="p">,</span><span class="w"> </span><span class="n">keycode</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">GLFW_PRESS</span><span class="w"> </span><span class="o">||</span>
+<span class="w">           </span><span class="n">state</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">GLFW_REPEAT</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>执行步骤：</p>
+<ol>
+<li>从全局 Application 取得当前 Window；</li>
+<li>取得原生窗口句柄；</li>
+<li>转换为 <code>GLFWwindow*</code>；</li>
+<li>调用 <code>glfwGetKey()</code>；</li>
+<li>把 <code>GLFW_PRESS</code> 和 <code>GLFW_REPEAT</code> 都视为按键处于按下状态。</li>
+</ol>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Input::IsKeyPressed] --&gt; B[WindowsInput::IsKeyPressedImpl]
+    B --&gt; C[取得 GLFWwindow]
+    C --&gt; D[glfwGetKey]
+    D --&gt; E{state}
+    E -- GLFW_PRESS --&gt; F[返回 true]
+    E -- GLFW_REPEAT --&gt; F
+    E -- GLFW_RELEASE --&gt; G[返回 false]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_13_24.png" alt="通过 glfwGetKey 实现 IsKeyPressedImpl" loading="lazy">
+  <p class="video-caption">📷 通过 glfwGetKey 实现 IsKeyPressedImpl<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=19&t=804" target="_blank" rel="noopener">回到原视频 (00:13:24)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_15_11.png" alt="把 PRESS 与 REPEAT 都视为键处于按下状态" loading="lazy">
+  <p class="video-caption">📷 把 PRESS 与 REPEAT 都视为键处于按下状态<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=19&t=911" target="_blank" rel="noopener">回到原视频 (00:15:11)</a></p>
+</div>
+
+<h2 id="6">6. 实现鼠标轮询</h2>
+<p><em>(参考时间: 00:17:09)</em></p>
+<p>鼠标接口包括按钮、位置和独立坐标。</p>
+<h3 id="61">6.1 鼠标按钮</h3>
+<div class="highlight"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">WindowsInput::IsMouseButtonPressedImpl</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">button</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">window</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">GLFWwindow</span><span class="o">*&gt;</span><span class="p">(</span>
+<span class="w">        </span><span class="n">Application</span><span class="o">::</span><span class="n">Get</span><span class="p">()</span>
+<span class="w">            </span><span class="p">.</span><span class="n">GetWindow</span><span class="p">()</span>
+<span class="w">            </span><span class="p">.</span><span class="n">GetNativeWindow</span><span class="p">());</span>
+
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">glfwGetMouseButton</span><span class="p">(</span><span class="n">window</span><span class="p">,</span><span class="w"> </span><span class="n">button</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">GLFW_PRESS</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>鼠标按钮没有 <code>GLFW_REPEAT</code> 状态，因此只需要判断 <code>GLFW_PRESS</code>。</p>
+<h3 id="62">6.2 鼠标位置</h3>
+<div class="highlight"><pre><span></span><code><span class="n">std</span><span class="o">::</span><span class="n">pair</span><span class="o">&lt;</span><span class="kt">float</span><span class="p">,</span><span class="w"> </span><span class="kt">float</span><span class="o">&gt;</span><span class="w"> </span><span class="n">WindowsInput</span><span class="o">::</span><span class="n">GetMousePositionImpl</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">window</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">GLFWwindow</span><span class="o">*&gt;</span><span class="p">(</span>
+<span class="w">        </span><span class="n">Application</span><span class="o">::</span><span class="n">Get</span><span class="p">()</span>
+<span class="w">            </span><span class="p">.</span><span class="n">GetWindow</span><span class="p">()</span>
+<span class="w">            </span><span class="p">.</span><span class="n">GetNativeWindow</span><span class="p">());</span>
+
+<span class="w">    </span><span class="kt">double</span><span class="w"> </span><span class="n">xpos</span><span class="p">,</span><span class="w"> </span><span class="n">ypos</span><span class="p">;</span>
+<span class="w">    </span><span class="n">glfwGetCursorPos</span><span class="p">(</span><span class="n">window</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">xpos</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ypos</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">(</span><span class="kt">float</span><span class="p">)</span><span class="n">xpos</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">float</span><span class="p">)</span><span class="n">ypos</span><span class="w"> </span><span class="p">};</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><code>glfwGetCursorPos()</code> 接收两个输出参数指针，并返回 <code>double</code>。Hazel 的输入 API 暂时转换为 <code>float</code>，避免客户端直接处理 GLFW 的数据类型。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant C as Client
+    participant I as Input
+    participant W as WindowsInput
+    participant G as GLFW
+
+    C-&gt;&gt;I: GetMousePosition()
+    I-&gt;&gt;W: GetMousePositionImpl()
+    W-&gt;&gt;G: glfwGetCursorPos(window, &amp;x, &amp;y)
+    G--&gt;&gt;W: double x, double y
+    W--&gt;&gt;I: pair&lt;float, float&gt;
+    I--&gt;&gt;C: pair&lt;float, float&gt;
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_18_25.png" alt="实现鼠标按钮与鼠标位置轮询" loading="lazy">
+  <p class="video-caption">📷 实现鼠标按钮与鼠标位置轮询<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=19&t=1105" target="_blank" rel="noopener">回到原视频 (00:18:25)</a></p>
+</div>
+
+<h3 id="63-x-y">6.3 独立 X / Y 坐标</h3>
+<p><code>GetMouseX()</code> 和 <code>GetMouseY()</code> 复用位置查询：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">float</span><span class="w"> </span><span class="nf">WindowsInput::GetMouseXImpl</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">auto</span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">GetMousePositionImpl</span><span class="p">();</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">x</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">float</span><span class="w"> </span><span class="nf">WindowsInput::GetMouseYImpl</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">auto</span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">GetMousePositionImpl</span><span class="p">();</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">y</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这里使用 C++17 的结构化绑定，直接把 <code>std::pair&lt;float, float&gt;</code> 拆成两个具名变量。相比 C++14 时代的 <code>std::get&lt;0&gt;()</code> 和 <code>std::get&lt;1&gt;()</code>，代码更直观。</p>
+<div class="highlight"><pre><span></span><code><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Input</span><span class="o">::</span><span class="n">GetMousePosition</span><span class="p">();</span>
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_21_04.png" alt="使用 C++17 结构化绑定拆分鼠标坐标" loading="lazy">
+  <p class="video-caption">📷 使用 C++17 结构化绑定拆分鼠标坐标<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=19&t=1264" target="_blank" rel="noopener">回到原视频 (00:21:04)</a></p>
+</div>
+
+<h2 id="7-input">7. 初始化 Input 单例</h2>
+<p><em>(参考时间: 00:22:18)</em></p>
+<p><code>Input</code> 需要一个实际的平台实例。它不需要依赖 Application 或 Window 的构造函数，因此可以直接在 <code>WindowsInput.cpp</code> 中初始化：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Input</span><span class="o">*</span><span class="w"> </span><span class="n">Input</span><span class="o">::</span><span class="n">s_Instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">WindowsInput</span><span class="p">();</span>
+</code></pre></div>
+
+<p>这个静态对象在程序启动时创建。此时创建的是 <code>WindowsInput</code> 实例本身，并不会立即查询窗口；真正的 <code>Application::Get().GetWindow()</code> 调用发生在客户端轮询输入时。</p>
+<p>因此初始化顺序可以理解为：</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[程序加载] --&gt; B[创建 WindowsInput]
+    B --&gt; C[Input::s_Instance 指向它]
+    C --&gt; D[Application 创建 Window]
+    D --&gt; E[客户端查询 Input]
+    E --&gt; F[通过 Application 取得原生窗口]
+    F --&gt; G[调用 GLFW 查询实时状态]
+</code></pre></div>
+
+<p>编者说明：<code>new WindowsInput()</code> 创建的对象在该版本中不会显式删除。它属于进程级单例，生命周期持续到程序结束，因此本讲没有处理释放；如果以后引入独立初始化和关闭顺序，应把这个生命周期改成明确管理的方案。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_22_18.png" alt="在 WindowsInput.cpp 中创建 Input 静态实例" loading="lazy">
+  <p class="video-caption">📷 在 WindowsInput.cpp 中创建 Input 静态实例<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=19&t=1338" target="_blank" rel="noopener">回到原视频 (00:22:18)</a></p>
+</div>
+
+<h2 id="8">8. 测试输入轮询</h2>
+<p><em>(参考时间: 00:23:36)</em></p>
+<p>为了验证链路，可以在 <code>Application::Run()</code> 的循环里读取鼠标位置并记录日志：</p>
+<div class="highlight"><pre><span></span><code><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Input</span><span class="o">::</span><span class="n">GetMousePosition</span><span class="p">();</span>
+<span class="n">HZ_CORE_TRACE</span><span class="p">(</span><span class="s">"Mouse position: {0}, {1}"</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">);</span>
+</code></pre></div>
+
+<p>运行 Sandbox 后，持续移动鼠标即可看到坐标变化，说明：</p>
+<ul>
+<li><code>Input::s_Instance</code> 已正确初始化；</li>
+<li><code>Application::Get()</code> 能取得当前窗口；</li>
+<li><code>GetNativeWindow()</code> 返回了有效 GLFW 句柄；</li>
+<li><code>glfwGetCursorPos()</code> 正在实时读取输入。</li>
+</ul>
+<p>视频只实际测试了鼠标位置。键盘、鼠标按钮、<code>GetMouseX()</code> 和 <code>GetMouseY()</code> 被留作练习。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_23_36.png" alt="在 Application 运行循环中输出实时鼠标位置" loading="lazy">
+  <p class="video-caption">📷 在 Application 运行循环中输出实时鼠标位置<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=19&t=1416" target="_blank" rel="noopener">回到原视频 (00:23:36)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_24_16.png" alt="日志中显示实时鼠标坐标，证明轮询链路工作" loading="lazy">
+  <p class="video-caption">📷 日志中显示实时鼠标坐标，证明轮询链路工作<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=19&t=1456" target="_blank" rel="noopener">回到原视频 (00:24:16)</a></p>
+</div>
+
+<h2 id="9">9. 当前实现的边界</h2>
+<h3 id="91-glfw">9.1 仍使用 GLFW 键码</h3>
+<p>客户端目前仍需包含 GLFW 并使用：</p>
+<div class="highlight"><pre><span></span><code><span class="n">GLFW_KEY_TAB</span>
+<span class="n">GLFW_MOUSE_BUTTON_LEFT</span>
+</code></pre></div>
+
+<p>这只是暂时的平台编码。最终 Hazel 应提供自己的键盘和鼠标枚举，使公共 API 不依赖 GLFW。</p>
+<h3 id="92-application">9.2 每次查询都会访问 Application 和原生窗口</h3>
+<p><code>WindowsInput</code> 的每个 <code>Impl</code> 函数都通过：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Application</span><span class="o">::</span><span class="n">Get</span><span class="p">().</span><span class="n">GetWindow</span><span class="p">().</span><span class="n">GetNativeWindow</span><span class="p">()</span>
+</code></pre></div>
+
+<p>取得窗口。当前实现简单直接，但后续可以缓存句柄或在平台层提供更轻量的访问路径。</p>
+<h3 id="93-getmousex-getmousey">9.3 <code>GetMouseX()</code> 和 <code>GetMouseY()</code> 会查询两次光标位置</h3>
+<p>它们内部都调用 <code>GetMousePositionImpl()</code>。如果同一帧分别调用 X 和 Y，就会重复执行两次 <code>glfwGetCursorPos()</code>。客户端可以改用：</p>
+<div class="highlight"><pre><span></span><code><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Input</span><span class="o">::</span><span class="n">GetMousePosition</span><span class="p">();</span>
+</code></pre></div>
+
+<p>一次取得两个值。</p>
+<h3 id="94">9.4 单例生命周期尚未显式管理</h3>
+<p>进程级实例没有删除，也没有初始化状态检查。当前依赖静态初始化顺序和程序长期运行，后续需要更完整的生命周期设计。</p>
+<h2 id="10">10. 本节结论</h2>
+<p>本讲完成了 Hazel 输入系统的轮询部分：</p>
+<ul>
+<li>新增静态 <code>Input</code> 接口；</li>
+<li>用 <code>s_Instance</code> 转发到平台实现；</li>
+<li>新增 <code>WindowsInput</code>；</li>
+<li>为 Window 增加 <code>GetNativeWindow()</code>；</li>
+<li>使用 <code>glfwGetKey()</code> 查询键盘；</li>
+<li>使用 <code>glfwGetMouseButton()</code> 查询鼠标按钮；</li>
+<li>使用 <code>glfwGetCursorPos()</code> 查询鼠标位置；</li>
+<li>提供 <code>GetMousePosition()</code>、<code>GetMouseX()</code> 和 <code>GetMouseY()</code>；</li>
+<li>使用 C++17 结构化绑定简化 pair；</li>
+<li>在窗口平台实现中初始化 Input 单例；</li>
+<li>通过日志验证实时鼠标坐标。</li>
+</ul>
+<p>事件系统负责“输入发生时通知”，输入轮询负责“当前是否正在输入”。两者结合后，Hazel 才能同时支持一次性动作和持续状态控制。下一讲将继续替换 GLFW 键码，建立 Hazel 自己的键码与鼠标按钮编码。</p>
+<h2 id="_2">附：参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=19">Bilibili 精译视频：019 - 输入轮询</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/tree/e1bb18d2c8e9c514d959c2eeb55d24af00d169ff">本期对应代码提交 <code>e1bb18d2</code></a></li>
+<li><a href="https://www.glfw.org/docs/latest/input_guide.html">GLFW Input Guide</a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>
