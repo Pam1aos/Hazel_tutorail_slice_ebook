@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 025：渲染前维护与静态库决策</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: #f3f4f6; font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+            code { overflow-wrap: anywhere; word-break: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-025">Hazel 游戏引擎笔记 025：渲染前维护与静态库决策</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=25">The Cherno 游戏引擎系列第 25 讲“渲染与维护”</a>，时长约 24 分 59 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材。<br />
+编者说明：本讲没有直接对应的代码提交。后续 Hazel 提交 <code>440d937a</code> 实现了“改为静态库并修复警告”，可视为本讲讨论的落地结果。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>本讲原计划开始渲染器，但清理代码时发现 Hazel 仍存在 ImGui DLL 符号导出问题。因此视频临时转向维护工作，讨论：</p>
+<ul>
+<li>ImGui 静态库链接进 Hazel DLL 后为什么丢失符号；</li>
+<li>如何用导出宏临时解决；</li>
+<li>如何用 <code>.def</code> 模块定义文件长期解决；</li>
+<li>为什么最终更倾向于把 Hazel 改成静态库；</li>
+<li>下一阶段渲染器的实现顺序。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[发现 ImGui 链接错误] --&gt; B[分析静态库与 DLL 边界]
+    B --&gt; C[临时导出宏方案]
+    B --&gt; D[.def 导出方案]
+    C --&gt; E[能构建，但依赖人为维护]
+    D --&gt; F[更完整，但签名维护困难]
+    E --&gt; G[转向静态库讨论]
+    F --&gt; G
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_01_37.png" alt="本讲从渲染计划转向 Hazel 的维护与库类型讨论" loading="lazy">
+  <p class="video-caption">📷 本讲从渲染计划转向 Hazel 的维护与库类型讨论<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=25&t=97" target="_blank" rel="noopener">回到原视频 (00:01:37)</a></p>
+</div>
+
+<h2 id="1">1. 当前构建结构</h2>
+<p><em>(参考时间: 00:02:04)</em></p>
+<p>ImGui 被编译为静态库：</p>
+<div class="highlight"><pre><span></span><code>ImGui.lib
+</code></pre></div>
+
+<p>它与 Hazel 链接：</p>
+<div class="highlight"><pre><span></span><code>ImGui.lib -&gt; Hazel.dll
+</code></pre></div>
+
+<p>Sandbox 又链接 Hazel：</p>
+<div class="highlight"><pre><span></span><code>Hazel.dll -&gt; Sandbox.exe
+</code></pre></div>
+
+<p>完整结构：</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[ImGui static library] --&gt; B[Hazel DLL]
+    B --&gt; C[Sandbox EXE]
+</code></pre></div>
+
+<p>Sandbox 如果直接调用：</p>
+<div class="highlight"><pre><span></span><code><span class="n">ImGui</span><span class="o">::</span><span class="n">Begin</span><span class="p">(</span><span class="s">"Test"</span><span class="p">);</span>
+<span class="n">ImGui</span><span class="o">::</span><span class="n">End</span><span class="p">();</span>
+</code></pre></div>
+
+<p>链接器会尝试从 Hazel DLL 导入 <code>ImGui::Begin</code>、<code>ImGui::End</code> 等符号。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_02_52.png" alt="ImGui 静态库先链接到 Hazel DLL，Sandbox 再链接 Hazel" loading="lazy">
+  <p class="video-caption">📷 ImGui 静态库先链接到 Hazel DLL，Sandbox 再链接 Hazel<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=25&t=172" target="_blank" rel="noopener">回到原视频 (00:02:52)</a></p>
+</div>
+
+<h2 id="2-imgui">2. 为什么会丢失 ImGui 符号</h2>
+<p><em>(参考时间: 00:04:33)</em></p>
+<p>DLL 的链接器会丢弃未被 Hazel 内部使用的符号。</p>
+<p>如果 Hazel DLL 自己没有调用：</p>
+<div class="highlight"><pre><span></span><code><span class="n">ImGui</span><span class="o">::</span><span class="n">Begin</span>
+<span class="n">ImGui</span><span class="o">::</span><span class="n">End</span>
+<span class="n">ImGui</span><span class="o">::</span><span class="n">ColorEdit4</span>
+</code></pre></div>
+
+<p>那么它们可能不会出现在最终的 <code>Hazel.dll</code> 导出表中。Sandbox 之后想使用这些函数，就得到：</p>
+<div class="highlight"><pre><span></span><code>unresolved external symbol
+</code></pre></div>
+
+<p>问题不一定是“ImGui 没编译”，而是：</p>
+<ol>
+<li>ImGui 静态库已经进入 Hazel 链接流程；</li>
+<li>Hazel DLL 没有使用其中某些函数；</li>
+<li>链接器优化掉死代码；</li>
+<li>这些符号既没有被保留，也没有被导出；</li>
+<li>Sandbox 最终无法导入。</li>
+</ol>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[ImGui.lib 包含全部函数] --&gt; B[链接进 Hazel.dll]
+    B --&gt; C{Hazel 自己使用该函数吗?}
+    C -- 是 --&gt; D[保留并可能导出]
+    C -- 否 --&gt; E[链接器丢弃未使用函数]
+    E --&gt; F[Sandbox 导入失败]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_04_33.png" alt="DLL 链接器会丢弃未使用的 ImGui 符号" loading="lazy">
+  <p class="video-caption">📷 DLL 链接器会丢弃未使用的 ImGui 符号<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=25&t=273" target="_blank" rel="noopener">回到原视频 (00:04:33)</a></p>
+</div>
+
+<h2 id="3">3. 临时方案一：强制使用并导出符号</h2>
+<p><em>(参考时间: 00:06:54)</em></p>
+<p>第一种方案是：</p>
+<ol>
+<li>在 Hazel 内部真的调用相关 ImGui 函数，防止它们被丢弃；</li>
+<li>把 <code>IMGUI_API</code> 在不同模块中定义为不同属性。</li>
+</ol>
+<p>构建 ImGui 与 Hazel 时：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#define IMGUI_API __declspec(dllexport)</span>
+</code></pre></div>
+
+<p>构建 Sandbox 时：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#define IMGUI_API __declspec(dllimport)</span>
+</code></pre></div>
+
+<p>这样可以显式导出和导入 ImGui 符号，Sandbox 中会出现 <code>Hello World</code> 窗口，并且该窗口仍可拖出主应用，说明多视口功能正常。</p>
+<p>但该方案依赖“符号刚好被使用”，对于未使用的函数仍可能失败。它适合快速验证，不是稳定长期方案。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Sandbox 需要 ImGui::Begin] --&gt; B{符号是否进入 Hazel.dll}
+    B -- 否 --&gt; C[强制 Hazel 使用该符号]
+    C --&gt; D[IMGUI_API dllexport]
+    D --&gt; E[Sandbox IMGUI_API dllimport]
+    E --&gt; F[链接成功]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_07_30.png" alt="通过 IMGUI_API 导入导出属性让 Sandbox 成功链接" loading="lazy">
+  <p class="video-caption">📷 通过 IMGUI_API 导入导出属性让 Sandbox 成功链接<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=25&t=450" target="_blank" rel="noopener">回到原视频 (00:07:30)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_07_43.png" alt="链接成功后 Hello World 窗口和浮动视口都能正常显示" loading="lazy">
+  <p class="video-caption">📷 链接成功后 Hello World 窗口和浮动视口都能正常显示<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=25&t=463" target="_blank" rel="noopener">回到原视频 (00:07:43)</a></p>
+</div>
+
+<h2 id="4-def">4. 长期方案二：使用 .def 模块定义文件</h2>
+<p><em>(参考时间: 00:09:39)</em></p>
+<p>更完整的做法是为 Hazel DLL 增加 Modules Definition File：</p>
+<div class="highlight"><pre><span></span><code>Hazel.def
+</code></pre></div>
+
+<p><code>.def</code> 文件列出希望从 DLL 导出的函数签名。</p>
+<p>概念结构：</p>
+<div class="highlight"><pre><span></span><code>LIBRARY Hazel
+
+EXPORTS
+    ; ImGui functions required by clients
+    ...
+</code></pre></div>
+
+<p>如果某个 ImGui 函数出现在 <code>.def</code> 中，链接器就必须把它保留在 Hazel DLL 并导出，即使 Hazel 自己没有调用它。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[ImGui.lib] --&gt; B[Hazel.dll]
+    C[Hazel.def 导出列表] --&gt; B
+    B --&gt; D[Sandbox 可导入指定符号]
+</code></pre></div>
+
+<p>视频展示了一份开发分支中的实际 <code>.def</code> 文件，其中包括：</p>
+<ul>
+<li>ShowDemoWindow；</li>
+<li>Begin；</li>
+<li>End；</li>
+<li>ColorEdit4；</li>
+<li>其它客户端需要的 ImGui 函数。</li>
+</ul>
+<h3 id="41-def">4.1 .def 的问题</h3>
+<p><code>.def</code> 文件很有效，但维护困难：</p>
+<ul>
+<li>必须手写函数签名；</li>
+<li>不能简单依赖编译器自动生成；</li>
+<li>新加客户端函数时容易忘记同步；</li>
+<li>不同编译器或 ABI 下需要仔细处理名称修饰；</li>
+<li>导出列表可能越来越长。</li>
+</ul>
+<p>因此它是“正确问题”的“麻烦方案”，但不是最省心的长期工作流。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_10_42.png" alt="通过 Hazel.def 手动列出需要导出的 ImGui 函数" loading="lazy">
+  <p class="video-caption">📷 通过 Hazel.def 手动列出需要导出的 ImGui 函数<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=25&t=642" target="_blank" rel="noopener">回到原视频 (00:10:42)</a></p>
+</div>
+
+<h2 id="5-hazel-dll">5. 转向讨论：Hazel 是否应该继续使用 DLL</h2>
+<p><em>(参考时间: 00:11:10)</em></p>
+<p>Cherno 开始重新评估 Hazel 的库类型。</p>
+<p>最初使用 DLL 的理由：</p>
+<ul>
+<li>方便客户端只链接 Hazel；</li>
+<li>理论上支持热替换引擎代码；</li>
+<li>可以减少某些客户端的链接配置。</li>
+</ul>
+<p>但在实际开发中，DLL 带来了大量问题：</p>
+<ul>
+<li>每个公共类型都需要 <code>HAZEL_API</code>；</li>
+<li><code>export / import</code> 宏遍布代码；</li>
+<li><code>std::shared_ptr</code> 跨 DLL 边界产生警告；</li>
+<li>模板跨 DLL 边界容易出问题；</li>
+<li>不同模块可能链接不同版本的 C++ Runtime；</li>
+<li>分发时需要携带多个 DLL；</li>
+<li>链接器可能丢弃未被引擎内部使用的符号；</li>
+<li>Sandbox 需要强制导入大量 ImGui 符号。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[DLL 边界] --&gt; B[需要 export/import 宏]
+    A --&gt; C[shared_ptr/STL 跨边界警告]
+    A --&gt; D[模板与 CRT 版本问题]
+    A --&gt; E[符号被剥离]
+    A --&gt; F[需要分发 DLL]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_13_30.png" alt="DLL 架构带来导出宏、STL 跨边界和 CRT 版本等维护成本" loading="lazy">
+  <p class="video-caption">📷 DLL 架构带来导出宏、STL 跨边界和 CRT 版本等维护成本<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=25&t=810" target="_blank" rel="noopener">回到原视频 (00:13:30)</a></p>
+</div>
+
+<h2 id="6">6. 静态库的优势</h2>
+<p><em>(参考时间: 00:12:16)</em></p>
+<p>如果 Hazel 改成静态库：</p>
+<div class="highlight"><pre><span></span><code>ImGui.lib + Hazel.lib -&gt; Sandbox.exe
+</code></pre></div>
+
+<p>优点包括：</p>
+<ul>
+<li>最终可执行文件直接包含所需代码；</li>
+<li>不需要 <code>__declspec(dllexport/dllimport)</code>；</li>
+<li>不会出现 DLL 导出表缺失符号问题；</li>
+<li>C++ Runtime 版本更统一；</li>
+<li>不需要分发一堆 DLL；</li>
+<li>链接器可以在整个程序范围内做内联等优化；</li>
+<li>能消除大量 DLL 边界警告；</li>
+<li>客户端构建流程更一致。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[ImGui] --&gt; B[Static Libraries]
+    C[Hazel] --&gt; B
+    B --&gt; D[Sandbox.exe]
+    D --&gt; E[单文件部署]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_17_17.png" alt="静态库把依赖链接进最终可执行文件，避免 DLL 边界问题" loading="lazy">
+  <p class="video-caption">📷 静态库把依赖链接进最终可执行文件，避免 DLL 边界问题<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=25&t=1037" target="_blank" rel="noopener">回到原视频 (00:17:17)</a></p>
+</div>
+
+<h2 id="7">7. 那么热重载怎么办</h2>
+<p><em>(参考时间: 00:15:49)</em></p>
+<p>热重载仍然有价值，但需要区分两部分：</p>
+<h3 id="71">7.1 游戏代码</h3>
+<p>游戏代码经常变化，适合：</p>
+<ul>
+<li>编译为 DLL；</li>
+<li>运行中替换；</li>
+<li>快速迭代玩法。</li>
+</ul>
+<h3 id="72">7.2 引擎代码</h3>
+<p>对于使用 Hazel 制作游戏的客户端，引擎通常已经稳定：</p>
+<ul>
+<li>不应该频繁修改引擎源码；</li>
+<li>真正需要热重载的是游戏代码；</li>
+<li>把 Hazel 本身做成 DLL 并不一定带来实际收益。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[需要热重载什么?] --&gt; B[游戏/应用代码]
+    A --&gt; C[引擎代码]
+    B --&gt; D[可以单独编译为 DLL]
+    C --&gt; E[通常不需要动态热替换]
+    E --&gt; F[Hazel 可用静态库]
+</code></pre></div>
+
+<p>未来也可以采用类似 id Software 的方案：</p>
+<ul>
+<li>引擎本体为静态库或可执行程序；</li>
+<li>游戏模块单独做成 DLL；</li>
+<li>引擎负责加载和替换游戏 DLL。</li>
+</ul>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_15_49.png" alt="热重载应优先用于游戏代码，而不是不断替换引擎本体" loading="lazy">
+  <p class="video-caption">📷 热重载应优先用于游戏代码，而不是不断替换引擎本体<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=25&t=949" target="_blank" rel="noopener">回到原视频 (00:15:49)</a></p>
+</div>
+
+<h2 id="8">8. 支持两种构建方式是否值得</h2>
+<p>视频讨论了同时支持 DLL 和静态库的可能，但最终倾向只选择一种。</p>
+<p>原因不是技术上做不到，而是：</p>
+<ul>
+<li>项目主要由一个人维护；</li>
+<li>多套构建路径会增加测试矩阵；</li>
+<li>某些代码必须针对 DLL 边界特殊处理；</li>
+<li>多余的灵活性会制造长期维护成本；</li>
+<li>对 Hazel 来说，建立清晰、稳定的工作流更重要。</li>
+</ul>
+<p>这与上一讲讨论 Render API 时的观点一致：通用和灵活并不自动等于更好，项目需要找到合适的边界。</p>
+<h2 id="9">9. 维护任务</h2>
+<p><em>(参考时间: 00:20:42)</em></p>
+<p>转换静态库时会顺带处理：</p>
+<ol>
+<li>移除不再需要的 <code>HAZEL_API</code> 导出宏；</li>
+<li>清理 Premake 配置；</li>
+<li>为第三方 ImGui 定义 <code>_CRT_SECURE_NO_WARNINGS</code>；</li>
+<li>处理已有 C++ 警告；</li>
+<li>验证干净检出能够直接构建；</li>
+<li>尝试让 Hazel 在零警告条件下构建。</li>
+</ol>
+<p>第三方代码使用旧的 CRT 函数时，Hazel 不应直接修改 ImGui，而是在构建 ImGui 模块时用预处理器宏抑制相关警告。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[切换静态库] --&gt; B[移除 export/import]
+    B --&gt; C[清理 Premake]
+    C --&gt; D[抑制第三方警告]
+    D --&gt; E[修复自有警告]
+    E --&gt; F[零警告构建]
+</code></pre></div>
+
+<h2 id="10">10. 下一阶段渲染实现计划</h2>
+<p><em>(参考时间: 00:22:04)</em></p>
+<p>维护完成后，渲染从最小闭环开始。</p>
+<h3 id="101-opengl-render-context">10.1 OpenGL Render Context</h3>
+<p>建立：</p>
+<ul>
+<li>OpenGL Context；</li>
+<li>Swap Chain；</li>
+<li>必要的窗口与图形上下文连接。</li>
+</ul>
+<h3 id="102-shader-compilation-helper">10.2 Shader Compilation Helper</h3>
+<p>增加一个基础 Shader 编译辅助模块，方便快速创建和调试 Shader。</p>
+<h3 id="103">10.3 每集都尽量看到结果</h3>
+<p>视频明确计划避免“连续五集只写底层，最后才看到三角形”。实现策略是：</p>
+<ol>
+<li>先写最小的 OpenGL 客户端代码；</li>
+<li>立即让三角形显示在屏幕上；</li>
+<li>再把代码逐步提取到类；</li>
+<li>提取到 Hazel Render API；</li>
+<li>最后抽象为 Renderer。</li>
+</ol>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[最小 OpenGL 代码] --&gt; B[立即显示三角形]
+    B --&gt; C[提取 Context / SwapChain]
+    C --&gt; D[提取 Shader / Buffers]
+    D --&gt; E[完善 Render API]
+    E --&gt; F[构建 Renderer]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_22_53.png" alt="先让屏幕上出现三角形，再逐步提取 Context、SwapChain、Shader 和 Render API" loading="lazy">
+  <p class="video-caption">📷 先让屏幕上出现三角形，再逐步提取 Context、SwapChain、Shader 和 Render API<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=25&t=1373" target="_blank" rel="noopener">回到原视频 (00:22:53)</a></p>
+</div>
+
+<h2 id="11">11. 本讲结论</h2>
+<p>本讲没有完成新渲染功能，但解决了渲染长期维护的前置问题：</p>
+<ul>
+<li>定位 ImGui 静态库链接进 Hazel DLL 后的符号剥离问题；</li>
+<li>用 <code>IMGUI_API dllexport/dllimport</code> 临时修复；</li>
+<li>介绍 <code>.def</code> 模块定义文件的长期导出方案；</li>
+<li>认识到 <code>.def</code> 维护成本很高；</li>
+<li>重新评估 Hazel 使用 DLL 的收益与成本；</li>
+<li>倾向改为静态库；</li>
+<li>区分引擎热重载与游戏代码热重载；</li>
+<li>决定优先建立简单、稳定的构建工作流；</li>
+<li>规划静态库转换、警告清理和零警告构建；</li>
+<li>渲染从 OpenGL Context、Swap Chain 和 Shader Helper 开始；</li>
+<li>后续每集都尽量在屏幕上展示结果。</li>
+</ul>
+<p>编者说明：后续 Hazel 提交 <code>440d937a</code> 完成了“改为静态库并修复警告”，证明本讲讨论的方向最终进入了仓库。</p>
+<p>下一阶段将先完成静态库转换和仓库清理，再正式实现 OpenGL 渲染上下文与第一个三角形。</p>
+<h2 id="_2">附：参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=25">Bilibili 精译视频：025 - 渲染与维护</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel">The Cherno 的 Hazel 仓库</a></li>
+</ul>
+<blockquote>
+<p>编者说明：本讲本身没有代码提交；文末参考了后续静态库转换提交，仅用于说明讨论结果。</p>
+</blockquote>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>

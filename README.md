@@ -52,6 +52,10 @@
   - [Markdown 版本](<Hazel Game Engine/024 - Rendering Architecture/book.md>)
   - 视频来源：[Bilibili 精译版第 24 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=24)
   - 主题：Render API 与 Renderer 分层、Material、后端差异、Render Command Queue 和 OpenGL 实现路线
+- [025 - Rendering and Maintenance](<Hazel Game Engine/025 - Rendering and Maintenance/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/025 - Rendering and Maintenance/book.md>)
+  - 视频来源：[Bilibili 精译版第 25 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=25)
+  - 主题：ImGui DLL 符号问题、`.def` 导出、静态库决策、热重载边界和渲染阶段规划
 
 ## 南京大学操作系统原理 2026
 
