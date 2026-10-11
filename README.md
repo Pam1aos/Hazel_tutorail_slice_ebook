@@ -44,6 +44,10 @@
   - [Markdown 版本](<Hazel Game Engine/022 - ImGui Docking and Viewports/book.md>)
   - 视频来源：[Bilibili 精译版第 22 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=22)
   - 主题：ImGui docking 分支、官方 GLFW/OpenGL3 后端、Docking 与多视口、`OnImGuiRender` 和 LayerStack 索引修复
+- [023 - Introduction to Rendering](<Hazel Game Engine/023 - Introduction to Rendering/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/023 - Introduction to Rendering/book.md>)
+  - 视频来源：[Bilibili 精译版第 23 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=23)
+  - 主题：实时渲染、GPU、图形 API、跨平台抽象层、Renderer 分层和渲染命令队列
 
 ## 南京大学操作系统原理 2026
 
