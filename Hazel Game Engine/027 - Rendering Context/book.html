@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 027：实现渲染上下文</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: #f3f4f6; font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+            code { overflow-wrap: anywhere; word-break: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-027">Hazel 游戏引擎笔记 027：实现渲染上下文</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=27">The Cherno 游戏引擎系列第 27 讲“渲染上下文”</a>，时长约 27 分 03 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。代码参考提交：<a href="https://github.com/TheCherno/Hazel/tree/55fc4392"><code>55fc4392</code></a>。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材；术语和代码以原视频及同期 Hazel 仓库为准。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>静态库转换和零警告构建已经完成，终于可以开始 Renderer 的第一块基础设施：<strong>渲染上下文</strong>。</p>
+<p>当前 <code>WindowsWindow::Init()</code> 直接调用：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glfwMakeContextCurrent</span><span class="p">(</span><span class="n">m_Window</span><span class="p">);</span>
+<span class="n">gladLoadGLLoader</span><span class="p">(...);</span>
+</code></pre></div>
+
+<p><code>WindowsWindow::OnUpdate()</code> 直接调用：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glfwSwapBuffers</span><span class="p">(</span><span class="n">m_Window</span><span class="p">);</span>
+</code></pre></div>
+
+<p>这些操作都是 OpenGL 专用代码，却放在“Windows 窗口”实现中。未来 Hazel 还要支持 DirectX、Vulkan 和 Metal，因此需要把上下文逻辑移入 API 专用类。</p>
+<p>本讲设计：</p>
+<div class="highlight"><pre><span></span><code>GraphicsContext
+    ^
+    |
+OpenGLContext
+</code></pre></div>
+
+<p>WindowsWindow 只持有 <code>GraphicsContext*</code>，不再直接依赖 Glad 或具体 OpenGL 初始化流程。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[WindowsWindow] --&gt; B[GraphicsContext interface]
+    B --&gt; C[OpenGLContext]
+    B --&gt; D[Future VulkanContext]
+    B --&gt; E[Future DirectXContext]
+    B --&gt; F[Future MetalContext]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_02_50.png" alt="Renderer 的第一个基础组件是渲染上下文" loading="lazy">
+  <p class="video-caption">📷 Renderer 的第一个基础组件是渲染上下文<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=27&t=170" target="_blank" rel="noopener">回到原视频 (00:02:50)</a></p>
+</div>
+
+<h2 id="1">1. 什么是渲染上下文</h2>
+<p><em>(参考时间: 00:03:01)</em></p>
+<p>图形 API 需要先建立上下文，才能执行渲染命令。</p>
+<p>OpenGL 中，GLFW 已经帮助处理大量平台细节：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glfwMakeContextCurrent</span><span class="p">(</span><span class="n">window</span><span class="p">);</span>
+<span class="n">gladLoadGLLoader</span><span class="p">(...);</span>
+</code></pre></div>
+
+<p>OpenGL Context 创建后，当前线程后续的 OpenGL 调用就会作用于该上下文。</p>
+<p>Vulkan 则复杂得多，还可能涉及：</p>
+<ul>
+<li>Instance；</li>
+<li>Physical Device；</li>
+<li>Logical Device；</li>
+<li>Queue；</li>
+<li>Swap Chain；</li>
+<li>Framebuffer；</li>
+<li>平台 Surface。</li>
+</ul>
+<p>不同 API 的上下文逻辑差异巨大，因此必须由不同实现类负责。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[GraphicsContext] --&gt; B[OpenGL Context]
+    A --&gt; C[Vulkan Context]
+    B --&gt; D[GLFW + Glad]
+    C --&gt; E[Device / Queue / SwapChain]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_04_08.png" alt="OpenGL 上下文相对简单，Vulkan 上下文需要更多显式对象" loading="lazy">
+  <p class="video-caption">📷 OpenGL 上下文相对简单，Vulkan 上下文需要更多显式对象<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=27&t=248" target="_blank" rel="noopener">回到原视频 (00:04:08)</a></p>
+</div>
+
+<h2 id="2-glfw">2. 为什么要在 GLFW 之上再抽象</h2>
+<p><em>(参考时间: 00:06:40)</em></p>
+<p>GLFW 能帮助创建 OpenGL 和 Vulkan 上下文，但不负责 DirectX 和 Metal。</p>
+<p>如果 WindowsWindow 直接写：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glfwMakeContextCurrent</span><span class="p">(</span><span class="n">m_Window</span><span class="p">);</span>
+</code></pre></div>
+
+<p>那么它隐含地假设所有 Windows 窗口都使用 GLFW 创建的 OpenGL 或 Vulkan 上下文。</p>
+<p>未来如果运行时选择 DirectX 或 Metal，这段代码就不适用。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[WindowsWindow] --&gt; B{选择的图形 API}
+    B -- OpenGL --&gt; C[OpenGLContext]
+    B -- Vulkan --&gt; D[VulkanContext]
+    B -- DirectX --&gt; E[DirectXContext]
+    B -- Metal --&gt; F[MetalContext]
+</code></pre></div>
+
+<p>额外的 Context 抽象层不是重复 GLFW，而是为了把将来不属于 GLFW 的 API 也纳入同一生命周期接口。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_04_55.png" alt="WindowsWindow 不能把 OpenGL 或 GLFW 上下文写死" loading="lazy">
+  <p class="video-caption">📷 WindowsWindow 不能把 OpenGL 或 GLFW 上下文写死<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=27&t=295" target="_blank" rel="noopener">回到原视频 (00:04:55)</a></p>
+</div>
+
+<h2 id="3">3. 上下文所有权设计讨论</h2>
+<p><em>(参考时间: 00:10:00)</em></p>
+<p>视频先讨论 Context 应如何存储。</p>
+<h3 id="31">3.1 栈对象</h3>
+<div class="highlight"><pre><span></span><code><span class="n">OpenGLContext</span><span class="w"> </span><span class="nf">context</span><span class="p">(</span><span class="n">window</span><span class="p">);</span>
+</code></pre></div>
+
+<p>优点是生命周期自动管理，但 Context 需要多态。</p>
+<p>如果成员写成具体类型：</p>
+<div class="highlight"><pre><span></span><code><span class="n">OpenGLContext</span><span class="w"> </span><span class="n">m_Context</span><span class="p">;</span>
+</code></pre></div>
+
+<p>以后替换成 DirectXContext 时，WindowsWindow 类型仍被写死。</p>
+<h3 id="32">3.2 指针与多态</h3>
+<div class="highlight"><pre><span></span><code><span class="n">GraphicsContext</span><span class="o">*</span><span class="w"> </span><span class="n">m_Context</span><span class="p">;</span>
+</code></pre></div>
+
+<p>这样 WindowsWindow 只依赖抽象接口，可以指向不同后端实现。</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[WindowsWindow] --&gt; B[GraphicsContext*]
+    B --&gt; C[OpenGLContext]
+</code></pre></div>
+
+<h3 id="33-context">3.3 Context 是否全局或静态</h3>
+<p>视频还讨论过静态 Context：</p>
+<ul>
+<li>一个窗口通常只有一个渲染 API Context；</li>
+<li>但高级引擎可能让 DirectX 与 Vulkan 在同一窗口中混合渲染；</li>
+<li>也可能同时存在多个窗口和多个 Context。</li>
+</ul>
+<p>这类高级用法会让静态设计失效。</p>
+<p>当前 Hazel 只有一个窗口和一个上下文，因此先选择简单方案：</p>
+<div class="highlight"><pre><span></span><code>一个 Hazel Window 拥有一个 GraphicsContext
+</code></pre></div>
+
+<p>编者说明：视频明确表示这些设计不是最终方案，后续遇到多窗口或跨 API 需求时可以调整。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_10_00.png" alt="Context 需要多态，因此当前设计使用 GraphicsContext 指针" loading="lazy">
+  <p class="video-caption">📷 Context 需要多态，因此当前设计使用 GraphicsContext 指针<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=27&t=600" target="_blank" rel="noopener">回到原视频 (00:10:00)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_13_00.png" alt="当前先约定一个窗口对应一个上下文，保持实现简单" loading="lazy">
+  <p class="video-caption">📷 当前先约定一个窗口对应一个上下文，保持实现简单<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=27&t=780" target="_blank" rel="noopener">回到原视频 (00:13:00)</a></p>
+</div>
+
+<h2 id="4-graphicscontext">4. 创建 GraphicsContext 接口</h2>
+<p><em>(参考时间: 00:15:15)</em></p>
+<p>新增目录与文件：</p>
+<div class="highlight"><pre><span></span><code>Hazel/src/Hazel/Renderer/
+    GraphicsContext.h
+
+Hazel/src/Platform/OpenGL/
+    OpenGLContext.h
+    OpenGLContext.cpp
+</code></pre></div>
+
+<p><code>GraphicsContext.h</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#pragma once</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">Hazel</span><span class="w"> </span><span class="p">{</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">GraphicsContext</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">Init</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">SwapBuffers</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="p">}</span>
+</code></pre></div>
+
+<p>当前接口只包含两个最小功能：</p>
+<ul>
+<li><code>Init()</code>：初始化图形上下文；</li>
+<li><code>SwapBuffers()</code>：提交当前帧并交换前后缓冲。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>classDiagram
+    class GraphicsContext {
+        +Init()
+        +SwapBuffers()
+    }
+    class OpenGLContext {
+        -GLFWwindow* m_WindowHandle
+        +Init()
+        +SwapBuffers()
+    }
+    GraphicsContext &lt;|-- OpenGLContext
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_15_15.png" alt="新增 GraphicsContext 抽象接口和 OpenGL 平台目录" loading="lazy">
+  <p class="video-caption">📷 新增 GraphicsContext 抽象接口和 OpenGL 平台目录<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=27&t=915" target="_blank" rel="noopener">回到原视频 (00:15:15)</a></p>
+</div>
+
+<h2 id="5-openglcontext">5. OpenGLContext 头文件</h2>
+<p><em>(参考时间: 00:17:40)</em></p>
+<div class="highlight"><pre><span></span><code><span class="cp">#pragma once</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"Hazel/Renderer/GraphicsContext.h"</span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">GLFWwindow</span><span class="p">;</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">Hazel</span><span class="w"> </span><span class="p">{</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">OpenGLContext</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">GraphicsContext</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">OpenGLContext</span><span class="p">(</span><span class="n">GLFWwindow</span><span class="o">*</span><span class="w"> </span><span class="n">windowHandle</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">Init</span><span class="p">()</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">SwapBuffers</span><span class="p">()</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="n">GLFWwindow</span><span class="o">*</span><span class="w"> </span><span class="n">m_WindowHandle</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="51">5.1 为什么使用前向声明</h3>
+<p>头文件只需要知道 <code>GLFWwindow</code> 是一个类型，不需要完整定义：</p>
+<div class="highlight"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">GLFWwindow</span><span class="p">;</span>
+</code></pre></div>
+
+<p>因此无需把 <code>&lt;GLFW/glfw3.h&gt;</code> 放进公共头文件。</p>
+<p>真正访问 GLFW API 的 <code>.cpp</code> 才包含完整头文件。</p>
+<p>视频中出现了一个编译警告：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GLFWwindow</span><span class="p">;</span>
+</code></pre></div>
+
+<p>但 GLFW 将其定义为 <code>struct</code>。改为：</p>
+<div class="highlight"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">GLFWwindow</span><span class="p">;</span>
+</code></pre></div>
+
+<p>警告即可消失。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_17_40.png" alt="OpenGLContext 使用 GLFWwindow 前向声明，并覆盖 Init/SwapBuffers" loading="lazy">
+  <p class="video-caption">📷 OpenGLContext 使用 GLFWwindow 前向声明，并覆盖 Init/SwapBuffers<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=27&t=1060" target="_blank" rel="noopener">回到原视频 (00:17:40)</a></p>
+</div>
+
+<h2 id="6-openglcontext">6. OpenGLContext 实现</h2>
+<p><em>(参考时间: 00:20:43)</em></p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"hzpch.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"OpenGLContext.h"</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;GLFW/glfw3.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;glad/glad.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;GL/GL.h&gt;</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">Hazel</span><span class="w"> </span><span class="p">{</span>
+
+<span class="n">OpenGLContext</span><span class="o">::</span><span class="n">OpenGLContext</span><span class="p">(</span><span class="n">GLFWwindow</span><span class="o">*</span><span class="w"> </span><span class="n">windowHandle</span><span class="p">)</span>
+<span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="n">m_WindowHandle</span><span class="p">(</span><span class="n">windowHandle</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">HZ_CORE_ASSERT</span><span class="p">(</span><span class="n">windowHandle</span><span class="p">,</span><span class="w"> </span><span class="s">"Window handle is null!"</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">OpenGLContext::Init</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glfwMakeContextCurrent</span><span class="p">(</span><span class="n">m_WindowHandle</span><span class="p">);</span>
+
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">gladLoadGLLoader</span><span class="p">(</span>
+<span class="w">        </span><span class="p">(</span><span class="n">GLADloadproc</span><span class="p">)</span><span class="n">glfwGetProcAddress</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">HZ_CORE_ASSERT</span><span class="p">(</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="s">"Failed to initialize Glad!"</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">OpenGLContext::SwapBuffers</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glfwSwapBuffers</span><span class="p">(</span><span class="n">m_WindowHandle</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="p">}</span>
+</code></pre></div>
+
+<p>初始化顺序：</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant W as WindowsWindow
+    participant C as OpenGLContext
+    participant G as GLFW
+    participant L as Glad
+
+    W-&gt;&gt;C: new OpenGLContext(window)
+    W-&gt;&gt;C: Init()
+    C-&gt;&gt;G: glfwMakeContextCurrent(window)
+    C-&gt;&gt;G: glfwGetProcAddress
+    C-&gt;&gt;L: gladLoadGLLoader(...)
+    L--&gt;&gt;C: status
+</code></pre></div>
+
+<p>构造函数只保存窗口句柄并校验非空；真正的 OpenGL 初始化放在 <code>Init()</code> 中，使生命周期更明确。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_20_43.png" alt="在 OpenGLContext::Init 中设置当前上下文并加载 Glad" loading="lazy">
+  <p class="video-caption">📷 在 OpenGLContext::Init 中设置当前上下文并加载 Glad<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=27&t=1243" target="_blank" rel="noopener">回到原视频 (00:20:43)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_21_30.png" alt="SwapBuffers 把交换缓冲职责移入 Context" loading="lazy">
+  <p class="video-caption">📷 SwapBuffers 把交换缓冲职责移入 Context<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=27&t=1290" target="_blank" rel="noopener">回到原视频 (00:21:30)</a></p>
+</div>
+
+<h2 id="7-windowswindow">7. 修改 WindowsWindow</h2>
+<p><em>(参考时间: 00:19:18)</em></p>
+<p>WindowsWindow 不再直接初始化 Glad。</p>
+<h3 id="71">7.1 创建上下文</h3>
+<div class="highlight"><pre><span></span><code><span class="n">m_Window</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">glfwCreateWindow</span><span class="p">(</span>
+<span class="w">    </span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">props</span><span class="p">.</span><span class="n">Width</span><span class="p">,</span>
+<span class="w">    </span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">props</span><span class="p">.</span><span class="n">Height</span><span class="p">,</span>
+<span class="w">    </span><span class="n">m_Data</span><span class="p">.</span><span class="n">Title</span><span class="p">.</span><span class="n">c_str</span><span class="p">(),</span>
+<span class="w">    </span><span class="nb">nullptr</span><span class="p">,</span>
+<span class="w">    </span><span class="nb">nullptr</span><span class="p">);</span>
+
+<span class="n">m_Context</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">OpenGLContext</span><span class="p">(</span><span class="n">m_Window</span><span class="p">);</span>
+<span class="n">m_Context</span><span class="o">-&gt;</span><span class="n">Init</span><span class="p">();</span>
+</code></pre></div>
+
+<p>之后继续设置窗口回调和 VSync。</p>
+<h3 id="72">7.2 每帧交换缓冲</h3>
+<p>旧代码：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glfwSwapBuffers</span><span class="p">(</span><span class="n">m_Window</span><span class="p">);</span>
+</code></pre></div>
+
+<p>新代码：</p>
+<div class="highlight"><pre><span></span><code><span class="n">m_Context</span><span class="o">-&gt;</span><span class="n">SwapBuffers</span><span class="p">();</span>
+</code></pre></div>
+
+<p>WindowsWindow 不再知道当前使用的是 OpenGL。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[glfwCreateWindow] --&gt; B[new OpenGLContext]
+    B --&gt; C[Context::Init]
+    C --&gt; D[Window callbacks / VSync]
+    D --&gt; E[OnUpdate]
+    E --&gt; F[Context::SwapBuffers]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_19_18.png" alt="WindowsWindow 创建 OpenGLContext 并调用 Init" loading="lazy">
+  <p class="video-caption">📷 WindowsWindow 创建 OpenGLContext 并调用 Init<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=27&t=1158" target="_blank" rel="noopener">回到原视频 (00:19:18)</a></p>
+</div>
+
+<h2 id="8-opengl">8. 移除窗口中的 OpenGL 依赖</h2>
+<p>Window 层不再需要：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;glad/glad.h&gt;</span>
+<span class="n">glfwMakeContextCurrent</span><span class="p">(...)</span>
+<span class="n">gladLoadGLLoader</span><span class="p">(...)</span>
+<span class="n">glfwSwapBuffers</span><span class="p">(...)</span>
+</code></pre></div>
+
+<p>这些代码全部集中到 OpenGLContext。</p>
+<p>于是：</p>
+<ul>
+<li>WindowsWindow 只负责窗口生命周期与平台事件；</li>
+<li>OpenGLContext 负责 OpenGL 上下文与缓冲交换；</li>
+<li>未来可以由其它 Context 替换 OpenGL 实现。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[WindowsWindow] --&gt; B[window creation / events / VSync]
+    A --&gt; C[GraphicsContext]
+    C --&gt; D[OpenGLContext]
+    D --&gt; E[GLFW context + Glad + SwapBuffers]
+</code></pre></div>
+
+<h2 id="9">9. 编译与运行验证</h2>
+<p><em>(参考时间: 00:22:15)</em></p>
+<p>构建过程中出现 <code>class GLFWwindow</code> 与 <code>struct GLFWwindow</code> 不一致的警告，改为 <code>struct</code> 后消失。</p>
+<p>运行 Sandbox 后：</p>
+<ul>
+<li>窗口可以正常创建；</li>
+<li>原有粉色清屏仍然显示；</li>
+<li>Context 初始化成功；</li>
+<li>SwapBuffers 仍能正常提交画面。</li>
+</ul>
+<p>测试时尝试使用 OpenGL Immediate Mode 画图形，但没有成功。原因是：</p>
+<ul>
+<li>项目使用 Core Profile；</li>
+<li>现代 OpenGL 不再支持 <code>glBegin</code> / <code>glEnd</code> 一类立即模式函数；</li>
+<li>当前也没有可用的 Vertex Buffer 与 Shader 封装。</li>
+</ul>
+<p>因此本讲的目标不是画三角形，而是先建立一个可用的上下文底座。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_22_51.png" alt="修改 struct 声明后构建成功，Sandbox 正常运行" loading="lazy">
+  <p class="video-caption">📷 修改 struct 声明后构建成功，Sandbox 正常运行<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=27&t=1371" target="_blank" rel="noopener">回到原视频 (00:22:51)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_23_00.png" alt="应用仍能正常清屏，说明 Context 初始化和 SwapBuffers 工作" loading="lazy">
+  <p class="video-caption">📷 应用仍能正常清屏，说明 Context 初始化和 SwapBuffers 工作<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=27&t=1380" target="_blank" rel="noopener">回到原视频 (00:23:00)</a></p>
+</div>
+
+<h2 id="10-renderer">10. 清屏命令未来归属 Renderer</h2>
+<p><em>(参考时间: 00:24:22)</em></p>
+<p>当前 <code>Application::Run()</code> 中仍然调用：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glClearColor</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="n">glClear</span><span class="p">(</span><span class="n">GL_COLOR_BUFFER_BIT</span><span class="p">);</span>
+</code></pre></div>
+
+<p>视频指出，清屏颜色和清屏命令最终不应长期放在 Application：</p>
+<ul>
+<li>它属于 Renderer；</li>
+<li>未来会经过 Framebuffer / Render Target；</li>
+<li>Renderer 负责发出清屏与绘制命令；</li>
+<li>Context 只负责管理图形上下文和提交缓冲。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Application] --&gt; B[Renderer]
+    B --&gt; C[Framebuffer / Render Target]
+    B --&gt; D[Clear / Draw Commands]
+    D --&gt; E[GraphicsContext]
+</code></pre></div>
+
+<h2 id="11-api">11. 未来运行时选择 API</h2>
+<p><em>(参考时间: 00:25:00)</em></p>
+<p>Context 抽象完成后，可以在 WindowProps 中加入 API 选择：</p>
+<div class="highlight"><pre><span></span><code><span class="k">enum</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">RendererAPI</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">None</span><span class="p">,</span>
+<span class="w">    </span><span class="n">OpenGL</span><span class="p">,</span>
+<span class="w">    </span><span class="n">Vulkan</span><span class="p">,</span>
+<span class="w">    </span><span class="n">DirectX</span><span class="p">,</span>
+<span class="w">    </span><span class="n">Metal</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>概念创建逻辑：</p>
+<div class="highlight"><pre><span></span><code><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">m_Data</span><span class="p">.</span><span class="n">API</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">RendererAPI</span><span class="o">::</span><span class="no">OpenGL</span><span class="p">:</span>
+<span class="w">        </span><span class="n">m_Context</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">OpenGLContext</span><span class="p">(</span><span class="n">m_Window</span><span class="p">);</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// ...</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>当前阶段仍然固定使用 OpenGL，但 Context 接口已经为未来选择后端腾出了位置。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[WindowProps.API] --&gt; B{选择后端}
+    B -- OpenGL --&gt; C[OpenGLContext]
+    B -- Vulkan --&gt; D[VulkanContext]
+    B -- DirectX --&gt; E[DirectXContext]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_25_00.png" alt="未来可在运行时依据 WindowProps 选择不同 Context 实现" loading="lazy">
+  <p class="video-caption">📷 未来可在运行时依据 WindowProps 选择不同 Context 实现<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=27&t=1500" target="_blank" rel="noopener">回到原视频 (00:25:00)</a></p>
+</div>
+
+<h2 id="12">12. 本节结论</h2>
+<p>本讲完成了 Renderer 的第一个独立组件：</p>
+<ul>
+<li>识别 WindowsWindow 直接包含 OpenGL 初始化代码的问题；</li>
+<li>新增 <code>GraphicsContext</code> 抽象接口；</li>
+<li>新增 <code>OpenGLContext</code>；</li>
+<li>Context 构造函数接收窗口句柄；</li>
+<li><code>Init()</code> 设置当前 Context 并初始化 Glad；</li>
+<li><code>SwapBuffers()</code> 封装 GLFW 缓冲交换；</li>
+<li>WindowsWindow 改为持有 <code>GraphicsContext*</code>；</li>
+<li>移除了 Window 对 Glad 和上下文初始化函数的直接依赖；</li>
+<li>Context 使用多态指针，为 Vulkan / DirectX / Metal 预留空间；</li>
+<li>运行验证 Context 正常；</li>
+<li>明确清屏命令和 Framebuffer 未来归 Renderer 管理。</li>
+</ul>
+<p>下一阶段将开始实现 Renderer 类，负责清屏颜色、渲染命令与状态管理。</p>
+<h2 id="_2">附：参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=27">Bilibili 精译视频：027 - 渲染上下文</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/tree/55fc4392">本期对应代码提交 <code>55fc4392</code></a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>

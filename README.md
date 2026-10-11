@@ -60,6 +60,10 @@
   - [Markdown 版本](<Hazel Game Engine/026 - Static Library and Zero Warnings/book.md>)
   - 视频来源：[Bilibili 精译版第 26 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=26)
   - 主题：Hazel 静态库转换、统一静态 Runtime、`HZ_DYNAMIC_LINK`、CRT/PCH 警告处理和零警告构建
+- [027 - Rendering Context](<Hazel Game Engine/027 - Rendering Context/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/027 - Rendering Context/book.md>)
+  - 视频来源：[Bilibili 精译版第 27 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=27)
+  - 主题：`GraphicsContext`、`OpenGLContext`、WindowsWindow 上下文迁移、Init/SwapBuffers 和未来多 API 选择
 
 ## 南京大学操作系统原理 2026
 
