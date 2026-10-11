@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 024：渲染架构</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: #f3f4f6; font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+            code { overflow-wrap: anywhere; word-break: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-024">Hazel 游戏引擎笔记 024：渲染架构</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=24">The Cherno 游戏引擎系列第 24 讲“渲染架构”</a>，时长约 27 分 53 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材。<br />
+编者说明：本讲是架构设计演示，没有对应代码提交；文中的接口与职责分层是设计方向，不是已经完成的实现。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>上一讲讨论了为什么渲染困难。本讲把问题拆成两个主要区域：</p>
+<ol>
+<li><strong>Render API</strong>：与 OpenGL、Vulkan、DirectX、Metal 等具体图形 API 绑定的底层实现；</li>
+<li><strong>Renderer</strong>：与图形 API 无关的场景组织、排序、剔除、材质和渲染技术。</li>
+</ol>
+<p>目标是让上层 Renderer 只使用 Hazel 自己定义的抽象接口。将来更换图形后端时，Renderer 的业务逻辑尽量保持不变。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Renderer 上层逻辑] --&gt; B[Hazel Render API 抽象]
+    B --&gt; C[OpenGL 实现]
+    B --&gt; D[Vulkan 实现]
+    B --&gt; E[DirectX 实现]
+    B --&gt; F[Metal 实现]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_02_21.png" alt="渲染系统分成 API 专用区域与平台无关的 Renderer 区域" loading="lazy">
+  <p class="video-caption">📷 渲染系统分成 API 专用区域与平台无关的 Renderer 区域<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=24&t=141" target="_blank" rel="noopener">回到原视频 (00:02:21)</a></p>
+</div>
+
+<h2 id="1">1. 术语约定</h2>
+<p>视频明确说明，“Render API”这个术语不是来自统一教材，而是为了本系列讨论而采用的命名。</p>
+<p>本文沿用：</p>
+<ul>
+<li><strong>Render API</strong>：Hazel 为图形后端建立的抽象，以及它在 OpenGL、Vulkan 等后端上的具体实现；</li>
+<li><strong>Renderer</strong>：使用 Render API 的高层渲染系统；</li>
+<li><strong>图形 API</strong>：OpenGL、Vulkan、DirectX、Metal 等第三方接口。</li>
+</ul>
+<p>“API”一词在这个系列中有两种语境，需要根据上下文判断。</p>
+<h2 id="2-render-api">2. Render API 区域</h2>
+<p><em>(参考时间: 00:04:00)</em></p>
+<p>Render API 区域负责与具体图形 API 直接交互。最重要的抽象资源包括：</p>
+<table>
+<thead>
+<tr>
+<th>抽象资源</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Render Context</td>
+<td>管理当前图形上下文</td>
+</tr>
+<tr>
+<td>Swap Chain</td>
+<td>管理可显示图像并提交到屏幕</td>
+</tr>
+<tr>
+<td>Framebuffer</td>
+<td>作为渲染输出目标</td>
+</tr>
+<tr>
+<td>Vertex Buffer</td>
+<td>上传顶点数据</td>
+</tr>
+<tr>
+<td>Index Buffer</td>
+<td>上传索引数据</td>
+</tr>
+<tr>
+<td>Texture</td>
+<td>管理纹理资源</td>
+</tr>
+<tr>
+<td>Shader</td>
+<td>管理着色器与相关反射信息</td>
+</tr>
+<tr>
+<td>States</td>
+<td>保存渲染状态</td>
+</tr>
+<tr>
+<td>Pipeline</td>
+<td>描述固定功能与着色器阶段组合</td>
+</tr>
+<tr>
+<td>Render Pass</td>
+<td>描述一组渲染输出与附件</td>
+</tr>
+</tbody>
+</table>
+<p>这些对象在不同图形 API 中差异很大，因此需要多个后端实现。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Render API] --&gt; B[Context / SwapChain]
+    A --&gt; C[Framebuffer / RenderPass]
+    A --&gt; D[VertexBuffer / IndexBuffer]
+    A --&gt; E[Texture / Shader]
+    A --&gt; F[States / Pipeline]
+    B --&gt; G[OpenGL Implementation]
+    C --&gt; H[Vulkan Implementation]
+    D --&gt; I[DirectX Implementation]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_04_00.png" alt="Render API 区域包含上下文、缓冲、纹理、Shader、Pipeline 等底层原语" loading="lazy">
+  <p class="video-caption">📷 Render API 区域包含上下文、缓冲、纹理、Shader、Pipeline 等底层原语<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=24&t=240" target="_blank" rel="noopener">回到原视频 (00:04:00)</a></p>
+</div>
+
+<h2 id="3">3. 用抽象资源绘制三角形</h2>
+<p><em>(参考时间: 00:05:50)</em></p>
+<p>Renderer 不应直接写：</p>
+<div class="highlight"><pre><span></span><code>glGenBuffers
+glBindBuffer
+vkCmdBindPipeline
+vkCmdDraw
+</code></pre></div>
+
+<p>它应该使用 Hazel 的抽象资源：</p>
+<div class="highlight"><pre><span></span><code>创建 Render Context 与 Swap Chain
+创建 Framebuffer
+上传 Vertex Buffer
+上传 Index Buffer
+创建 Shader
+创建 Render Pass / Pipeline
+提交 Draw Call
+</code></pre></div>
+
+<p>当 Hazel 从 OpenGL 切换到 Vulkan 或 DirectX 12 时，这段 Renderer 逻辑理论上不需要改变。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant R as Renderer
+    participant A as Hazel Render API
+    participant G as Graphics API
+
+    R-&gt;&gt;A: CreateContext / SwapChain
+    R-&gt;&gt;A: CreateFramebuffer
+    R-&gt;&gt;A: Upload vertex/index data
+    R-&gt;&gt;A: Create shader/pipeline
+    R-&gt;&gt;A: Draw
+    A-&gt;&gt;G: Backend-specific calls
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_05_50.png" alt="Renderer 通过抽象接口绘制三角形，而不直接调用 OpenGL 或 Vulkan" loading="lazy">
+  <p class="video-caption">📷 Renderer 通过抽象接口绘制三角形，而不直接调用 OpenGL 或 Vulkan<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=24&t=350" target="_blank" rel="noopener">回到原视频 (00:05:50)</a></p>
+</div>
+
+<h2 id="4-renderer">4. Renderer 区域</h2>
+<p><em>(参考时间: 00:07:45)</em></p>
+<p>Renderer 负责与具体图形 API 无关的逻辑。</p>
+<h3 id="41-2d-3d-renderer">4.1 2D / 3D Renderer</h3>
+<p>Renderer2D、Renderer3D 或 forward、deferred 等高层渲染方案主要建立在 Render API 原语之上。</p>
+<h3 id="42-scene-graph-scene-manager">4.2 Scene Graph / Scene Manager</h3>
+<p>场景和图结构描述“世界里有什么”，不应该包含原始 OpenGL 调用。</p>
+<h3 id="43-render-sorting">4.3 Render Sorting</h3>
+<p>排序目标包括：</p>
+<ul>
+<li>保持透明物体正确绘制顺序；</li>
+<li>让使用相同 Material、Shader 或 Texture 的物体连续绘制；</li>
+<li>减少状态切换。</li>
+</ul>
+<h3 id="44-culling">4.4 Culling</h3>
+<p>包括视锥剔除、遮挡剔除等，只保留可能出现在画面中的对象。</p>
+<h3 id="45-lod">4.5 LOD</h3>
+<p>根据距离选择不同精度模型，减少远处网格的三角形数量。</p>
+<h3 id="46-animation">4.6 Animation</h3>
+<p>骨骼、关键帧、蒙皮等动画系统不直接依赖图形 API。</p>
+<h3 id="47-camera">4.7 Camera</h3>
+<p>Camera 确定观察矩阵、投影矩阵和可能的 Render Target。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Renderer] --&gt; B[Renderer2D / Renderer3D]
+    A --&gt; C[Scene Graph]
+    A --&gt; D[Sorting]
+    A --&gt; E[Culling]
+    A --&gt; F[LOD]
+    A --&gt; G[Animation]
+    A --&gt; H[Camera]
+    A --&gt; I[Material]
+    A --&gt; J[Post Effects]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_07_45.png" alt="Renderer 负责场景、排序、剔除、LOD、动画和相机" loading="lazy">
+  <p class="video-caption">📷 Renderer 负责场景、排序、剔除、LOD、动画和相机<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=24&t=465" target="_blank" rel="noopener">回到原视频 (00:07:45)</a></p>
+</div>
+
+<h2 id="5-material-material-instance">5. Material 与 Material Instance</h2>
+<p><em>(参考时间: 00:13:58)</em></p>
+<p>视频把 Material 简化定义为：</p>
+<div class="highlight"><pre><span></span><code>Material = Shader + Uniform Data
+</code></pre></div>
+
+<p>Material 保存与某个 Shader 配套的参数。Material Instance 基于同一个 Material，但拥有不同的参数值，例如不同的颜色、粗糙度或纹理。</p>
+<p>如果每个材质实例都重新创建一个 Shader 或重新编译变体，成本会非常高。因此典型设计是：</p>
+<ul>
+<li>多个实例共享 Shader；</li>
+<li>每个实例保存自己的 Uniform / 参数数据；</li>
+<li>渲染时绑定共享 Shader，再上传实例参数。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Shader] --&gt; B[Material]
+    B --&gt; C[Material Instance A]
+    B --&gt; D[Material Instance B]
+    B --&gt; E[Material Instance C]
+    C --&gt; F[不同 Uniform 数据]
+    D --&gt; G[不同纹理/颜色/参数]
+    E --&gt; H[不同实例配置]
+</code></pre></div>
+
+<p>Material 属于 Renderer 层，因为它描述的是资源和参数如何组织，而不是某个图形 API 的创建步骤。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_13_58.png" alt="Material 是 Shader 加 Uniform 数据，Material Instance 共享 Shader" loading="lazy">
+  <p class="video-caption">📷 Material 是 Shader 加 Uniform 数据，Material Instance 共享 Shader<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=24&t=838" target="_blank" rel="noopener">回到原视频 (00:13:58)</a></p>
+</div>
+
+<h2 id="6-render-api">6. 哪些功能必须下沉到 Render API</h2>
+<p>Renderer 希望尽量通用，但某些高级功能需要图形 API 提供额外能力。</p>
+<p>例如：</p>
+<ul>
+<li>Vulkan 有 pipeline、descriptor set、fence、semaphore；</li>
+<li>OpenGL 很多状态和资源管理更隐式；</li>
+<li>延迟渲染在 OpenGL 与 Vulkan 中的实现方式可能差异很大；</li>
+<li>实例化需要底层 API 支持；</li>
+<li>Render Pass / Pipeline 的粒度可能直接影响性能。</li>
+</ul>
+<p>当通用原语不足时，可以把特定实现下沉到 Render API 区域：</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[高级渲染技术] --&gt; B{通用 Render API 原语足够吗?}
+    B -- 是 --&gt; C[Renderer 层只实现一次]
+    B -- 否 --&gt; D[把部分逻辑下沉到 Render API]
+    D --&gt; E[每个后端分别实现]
+    E --&gt; F[更高效但代码重复更多]
+</code></pre></div>
+
+<p>下移代码的收益是性能和控制力，代价是需要为每个后端分别写出对应实现。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_10_20.png" alt="高级技术可能需要下沉到 Render API 区域，并为每个后端重复实现" loading="lazy">
+  <p class="video-caption">📷 高级技术可能需要下沉到 Render API 区域，并为每个后端重复实现<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=24&t=620" target="_blank" rel="noopener">回到原视频 (00:10:20)</a></p>
+</div>
+
+<h2 id="7">7. 通用抽象与性能的矛盾</h2>
+<p><em>(参考时间: 00:17:43)</em></p>
+<p>理想情况下，一个强大的 Render API 可以让所有渲染技术只写一次，然后自动适配所有后端。</p>
+<p>但“通用”本身会带来代价：</p>
+<ul>
+<li>接口必须兼容所有后端；</li>
+<li>只能暴露最小的公共能力；</li>
+<li>高级技术可能需要绕过抽象；</li>
+<li>完全通用并不等于极致性能。</li>
+</ul>
+<p>视频把这个问题类比为通用游戏引擎与专用游戏引擎：</p>
+<ul>
+<li>通用引擎适用于更多项目；</li>
+<li>针对单个游戏定制的引擎通常能做得更快、更合适；</li>
+<li>因此通用 Render API 不可能在所有场景下都等同于直接使用 DirectX 12 或 Vulkan。</li>
+</ul>
+<p>这不是否定抽象，而是提醒后续设计必须持续衡量抽象层与性能。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_17_43.png" alt="通用 Render API 更容易维护，但可能牺牲高性能后端所需的控制力" loading="lazy">
+  <p class="video-caption">📷 通用 Render API 更容易维护，但可能牺牲高性能后端所需的控制力<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=24&t=1063" target="_blank" rel="noopener">回到原视频 (00:17:43)</a></p>
+</div>
+
+<h2 id="8-renderer-render-api">8. Renderer 与 Render API 的职责表</h2>
+<table>
+<thead>
+<tr>
+<th>功能</th>
+<th style="text-align: right;">Render API</th>
+<th style="text-align: right;">Renderer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Context / Swap Chain</td>
+<td style="text-align: right;">Yes</td>
+<td style="text-align: right;">No</td>
+</tr>
+<tr>
+<td>Framebuffer</td>
+<td style="text-align: right;">Yes</td>
+<td style="text-align: right;">Uses</td>
+</tr>
+<tr>
+<td>Vertex / Index Buffer</td>
+<td style="text-align: right;">Yes</td>
+<td style="text-align: right;">Uses</td>
+</tr>
+<tr>
+<td>Texture / Shader</td>
+<td style="text-align: right;">Yes</td>
+<td style="text-align: right;">Uses</td>
+</tr>
+<tr>
+<td>Pipeline / Render Pass</td>
+<td style="text-align: right;">Yes</td>
+<td style="text-align: right;">Uses</td>
+</tr>
+<tr>
+<td>Renderer2D / 3D</td>
+<td style="text-align: right;">No</td>
+<td style="text-align: right;">Yes</td>
+</tr>
+<tr>
+<td>Scene Graph</td>
+<td style="text-align: right;">No</td>
+<td style="text-align: right;">Yes</td>
+</tr>
+<tr>
+<td>Sorting / Culling</td>
+<td style="text-align: right;">No</td>
+<td style="text-align: right;">Yes</td>
+</tr>
+<tr>
+<td>Material System</td>
+<td style="text-align: right;">No</td>
+<td style="text-align: right;">Yes</td>
+</tr>
+<tr>
+<td>Material Instance</td>
+<td style="text-align: right;">No</td>
+<td style="text-align: right;">Yes</td>
+</tr>
+<tr>
+<td>LOD / Animation</td>
+<td style="text-align: right;">No</td>
+<td style="text-align: right;">Yes</td>
+</tr>
+<tr>
+<td>Camera</td>
+<td style="text-align: right;">No</td>
+<td style="text-align: right;">Yes</td>
+</tr>
+<tr>
+<td>Post Effects System</td>
+<td style="text-align: right;">Partly</td>
+<td style="text-align: right;">Yes</td>
+</tr>
+<tr>
+<td>Instancing</td>
+<td style="text-align: right;">Yes</td>
+<td style="text-align: right;">Uses</td>
+</tr>
+<tr>
+<td>Batching</td>
+<td style="text-align: right;">No</td>
+<td style="text-align: right;">Yes</td>
+</tr>
+</tbody>
+</table>
+<p>边界并不总是绝对。例如 Render Pass 既像底层原语，又被 Renderer 控制；Visual Effects 也可能需要 API 支持。</p>
+<h2 id="9-render-command-queue">9. Render Command Queue</h2>
+<p><em>(参考时间: 00:19:22)</em></p>
+<p>Renderer 与 Render API 之间还需要命令队列。</p>
+<p>基本流程：</p>
+<ol>
+<li>游戏线程提交 Render Command；</li>
+<li>命令被编码到连续内存缓冲区；</li>
+<li>渲染线程读取命令；</li>
+<li>渲染线程调用 Render API 执行；</li>
+<li>主线程继续处理下一条游戏逻辑或下一帧命令。</li>
+</ol>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant G as Game Thread
+    participant Q as Render Command Queue
+    participant R as Render Thread
+    participant A as Render API
+
+    G-&gt;&gt;Q: Encode BindVertexBuffer
+    G-&gt;&gt;Q: Encode BindShader
+    G-&gt;&gt;Q: Encode Draw
+    Q--&gt;&gt;R: Contiguous Command Buffer
+    R-&gt;&gt;A: Execute commands in order
+</code></pre></div>
+
+<p>Vulkan 原生有 command queue / command buffer 概念；OpenGL 没有同样完善的显式命令模型，因此 Hazel 可能需要自己建立。</p>
+<p>设计参考有两种方向：</p>
+<ul>
+<li>尽量模仿 DirectX 的命令风格；</li>
+<li>设计 Hazel 自己的模型。</li>
+</ul>
+<p>视频没有在此时定案。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_19_22.png" alt="Render Command Queue 把游戏线程提交与渲染线程执行解耦" loading="lazy">
+  <p class="video-caption">📷 Render Command Queue 把游戏线程提交与渲染线程执行解耦<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=24&t=1162" target="_blank" rel="noopener">回到原视频 (00:19:22)</a></p>
+</div>
+
+<h2 id="10">10. 实现路线</h2>
+<p><em>(参考时间: 00:21:11)</em></p>
+<h3 id="101-render-api">10.1 第一步：建立 Render API</h3>
+<p>先实现 OpenGL 版本：</p>
+<ul>
+<li>Context；</li>
+<li>Swap Chain；</li>
+<li>Framebuffer；</li>
+<li>Vertex / Index Buffer；</li>
+<li>Texture；</li>
+<li>Shader；</li>
+<li>State / Pipeline；</li>
+<li>Render Pass。</li>
+</ul>
+<p>目标是至少可以画出一个三角形。</p>
+<h3 id="102-renderer">10.2 第二步：建立基础 Renderer</h3>
+<p>一旦 Render API 能绘制三角形，就开始实现 Renderer，并持续迭代。</p>
+<p>随后逐步增加：</p>
+<ul>
+<li>Framebuffer / Render Texture；</li>
+<li>Material System；</li>
+<li>Shader Parser；</li>
+<li>PBR；</li>
+<li>3D 模型；</li>
+<li>Post Effects；</li>
+<li>其他高级技术。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[OpenGL Render API] --&gt; B[绘制三角形]
+    B --&gt; C[基础 Renderer]
+    C --&gt; D[Material / Shader Parser]
+    D --&gt; E[PBR / 3D Scene]
+    E --&gt; F[Post Effects]
+    F --&gt; G[其它图形 API]
+</code></pre></div>
+
+<h3 id="103">10.3 第三步：可选地实现其它后端</h3>
+<p>Vulkan、DirectX 11 / 12、Metal 会在 OpenGL 路线稳定后讨论。也可能先做场景系统、关卡编辑器、序列化、组件系统和脚本，再回到新图形后端。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_22_53.png" alt="实现顺序是 Render API、基础 Renderer、材质与高级渲染，再考虑其它后端" loading="lazy">
+  <p class="video-caption">📷 实现顺序是 Render API、基础 Renderer、材质与高级渲染，再考虑其它后端<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=24&t=1373" target="_blank" rel="noopener">回到原视频 (00:22:53)</a></p>
+</div>
+
+<h2 id="11-opengl">11. 为什么仍然先选 OpenGL</h2>
+<p><em>(参考时间: 00:21:11)</em></p>
+<p>如果只考虑个人高性能引擎，可能会直接选择 Vulkan。但本项目需要：</p>
+<ul>
+<li>尽快看到画面；</li>
+<li>让观众看到可展示结果；</li>
+<li>避免数集都耗在交换链初始化；</li>
+<li>留出时间实现场景、编辑器、序列化和脚本等游戏引擎系统。</li>
+</ul>
+<p>OpenGL 简单，但不代表设计可以粗糙。因为 OpenGL 隐藏了许多显式控制，Renderer API 反而需要更认真地组织资源与状态。</p>
+<h2 id="12">12. 本节结论</h2>
+<p>本讲形成了 Hazel 渲染架构的第一版设计：</p>
+<ul>
+<li>系统分为 platform/API-specific 的 Render API 与 platform/API-agnostic 的 Renderer；</li>
+<li>Render API 负责 Context、Swap Chain、Framebuffer、Buffer、Texture、Shader、Pipeline、Render Pass；</li>
+<li>Renderer 负责 2D/3D、场景图、排序、剔除、LOD、动画、相机、材质与 Post Effects；</li>
+<li>Material 由 Shader 与 Uniform 数据组成；</li>
+<li>Material Instance 共享 Shader，但拥有各自的参数；</li>
+<li>高级技术可能需要下沉到 Render API 区域；</li>
+<li>通用抽象与最高性能之间存在固有矛盾；</li>
+<li>Render Command Queue 可以解耦游戏线程与渲染线程；</li>
+<li>先从 OpenGL 开始，目标是尽快画出三角形；</li>
+<li>之后再扩展到 Vulkan、DirectX、Metal 等后端。</li>
+</ul>
+<p>下一阶段的重点是从最小可运行实现开始，而不是一次设计完整个 Renderer。</p>
+<h2 id="_2">附：参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=24">Bilibili 精译视频：024 - 渲染架构</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel">The Cherno 的 Hazel 仓库</a></li>
+</ul>
+<blockquote>
+<p>编者说明：本讲是架构演示，没有对应的代码提交，因此不标注特定 Hazel commit。</p>
+</blockquote>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>
