@@ -64,6 +64,10 @@
   - [Markdown 版本](<Hazel Game Engine/027 - Rendering Context/book.md>)
   - 视频来源：[Bilibili 精译版第 27 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=27)
   - 主题：`GraphicsContext`、`OpenGLContext`、WindowsWindow 上下文迁移、Init/SwapBuffers 和未来多 API 选择
+- [029 - OpenGL Shaders](<Hazel Game Engine/029 - OpenGL Shaders/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/029 - OpenGL Shaders/book.md>)
+  - 视频来源：[Bilibili 精译版第 29 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=29)
+  - 主题：Vertex/Fragment Shader、图形管线、编译与链接、`Shader` 类、Raw String、红色三角形、Varying 数据与颜色插值
 
 ## 南京大学操作系统原理 2026
 

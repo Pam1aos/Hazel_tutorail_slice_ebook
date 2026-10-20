@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 029：OpenGL 着色器</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: #f3f4f6; font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+            code { overflow-wrap: anywhere; word-break: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-029opengl">Hazel 游戏引擎笔记 029：OpenGL 着色器</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29">The Cherno 游戏引擎系列第 29 讲“OpenGL 着色器”</a>，时长约 42 分 46 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。代码参考提交：<a href="https://github.com/TheCherno/Hazel/tree/76ae3b81"><code>76ae3b81</code></a>。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材；术语和代码以原视频及同期 Hazel 仓库为准。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>上一讲已经能在 Hazel 中画出第一个三角形，但三角形没有使用 Shader。本讲补上 GPU 渲染的核心：</p>
+<ul>
+<li>解释什么 Shader；</li>
+<li>理解顶点 Shader 与片元 Shader；</li>
+<li>理解 GPU 图形管线中的数据流；</li>
+<li>编译并链接 OpenGL Shader 程序；</li>
+<li>创建 Hazel 的第一版 <code>Shader</code> 类；</li>
+<li>处理编译和链接错误日志；</li>
+<li>用 Shader 绘制红色三角形；</li>
+<li>从顶点 Shader 向片元 Shader 传递位置数据；</li>
+<li>观察颜色插值效果。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[顶点数据] --&gt; B[Vertex Shader]
+    B --&gt; C[图元装配与光栅化]
+    C --&gt; D[Fragment Shader]
+    D --&gt; E[像素颜色]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_06_40.png" alt="Shader 是让 GPU 处理顶点与像素数据的程序" loading="lazy">
+  <p class="video-caption">📷 Shader 是让 GPU 处理顶点与像素数据的程序<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=400" target="_blank" rel="noopener">回到原视频 (00:06:40)</a></p>
+</div>
+
+<h2 id="1-pbr">1. 开发分支的 PBR 预览</h2>
+<p><em>(参考时间: 00:02:35)</em></p>
+<p>视频开场先展示 Hazel 开发分支中的 PBR Demo，用来说明当前公开课程正在走向什么程度。</p>
+<p>演示包括：</p>
+<ul>
+<li>不同粗糙度的金属与电介质球；</li>
+<li>环境立方体贴图；</li>
+<li>HDR 曝光；</li>
+<li>模型、Albedo、Normal、Metalness、Roughness 纹理加载；</li>
+<li>基于环境贴图的反射。</li>
+</ul>
+<p>这不是本讲实现内容，而是说明前面的窗口、事件、ImGui、数学库和构建系统为渲染开发提供了基础。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[窗口 / 事件 / 输入] --&gt; E[渲染器]
+    B[ImGui / 编辑器接口] --&gt; E
+    C[数学库 GLM] --&gt; E
+    D[构建与平台抽象] --&gt; E
+    E --&gt; F[PBR / 材质 / 光照]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_02_35.png" alt="Hazel 开发分支中的 PBR Demo 展示渲染方向" loading="lazy">
+  <p class="video-caption">📷 Hazel 开发分支中的 PBR Demo 展示渲染方向<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=155" target="_blank" rel="noopener">回到原视频 (00:02:35)</a></p>
+</div>
+
+<h2 id="2-shader">2. 什么是 Shader</h2>
+<p><em>(参考时间: 00:06:49)</em></p>
+<p>Shader 是运行在 GPU 上的程序，用来决定 GPU 如何处理传入的数据。</p>
+<p>两种最常见的 Shader：</p>
+<table>
+<thead>
+<tr>
+<th>Shader</th>
+<th style="text-align: right;">执行次数</th>
+<th>主要职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Vertex Shader</td>
+<td style="text-align: right;">每个顶点一次</td>
+<td>计算顶点在裁剪空间中的位置</td>
+</tr>
+<tr>
+<td>Fragment / Pixel Shader</td>
+<td style="text-align: right;">每个片元或像素一次</td>
+<td>计算该像素最终颜色</td>
+</tr>
+</tbody>
+</table>
+<p>OpenGL 把它称为 Fragment Shader；DirectX 等 API 常称为 Pixel Shader。</p>
+<p>对于上一讲的三角形：</p>
+<div class="highlight"><pre><span></span><code>3 个顶点
+  -&gt; Vertex Shader 执行 3 次
+  -&gt; 光栅化产生大量片段
+  -&gt; Fragment Shader 为每个片段决定颜色
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>graph LR
+    A[3 个顶点] --&gt; B[Vertex Shader x3]
+    B --&gt; C[三角形光栅化]
+    C --&gt; D[大量 Fragment]
+    D --&gt; E[Fragment Shader]
+    E --&gt; F[颜色]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_08_10.png" alt="Vertex Shader 每个顶点运行一次，Fragment Shader 每个像素运行一次" loading="lazy">
+  <p class="video-caption">📷 Vertex Shader 每个顶点运行一次，Fragment Shader 每个像素运行一次<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=490" target="_blank" rel="noopener">回到原视频 (00:08:10)</a></p>
+</div>
+
+<h2 id="3">3. 图形管线中的数据流</h2>
+<p><em>(参考时间: 00:09:35)</em></p>
+<p>顶点 Shader 的主要输出是裁剪空间位置：</p>
+<div class="highlight"><pre><span></span><code><span class="nb">gl_Position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span>
+</code></pre></div>
+
+<p>裁剪空间坐标通常在：</p>
+<div class="highlight"><pre><span></span><code>x: -1 到 +1
+y: -1 到 +1
+z: -1 到 +1
+</code></pre></div>
+
+<p>顶点位置经过图元装配和光栅化后，被转换为覆盖三角形区域的片段。</p>
+<p>片元 Shader 再决定每个片段的颜色：</p>
+<div class="highlight"><pre><span></span><code><span class="k">out</span><span class="w"> </span><span class="kt">vec4</span><span class="w"> </span><span class="n">color</span><span class="p">;</span>
+<span class="n">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">vec4</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Vertex Buffer] --&gt; B[Vertex Shader]
+    B --&gt; C[Clip Space Position]
+    C --&gt; D[Primitive Assembly]
+    D --&gt; E[Rasterization]
+    E --&gt; F[Fragment Shader]
+    F --&gt; G[Framebuffer Color]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_10_29.png" alt="顶点 Shader 决定位置，片元 Shader 决定像素颜色" loading="lazy">
+  <p class="video-caption">📷 顶点 Shader 决定位置，片元 Shader 决定像素颜色<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=629" target="_blank" rel="noopener">回到原视频 (00:10:29)</a></p>
+</div>
+
+<h2 id="4-shader">4. Shader 编译与链接</h2>
+<p><em>(参考时间: 00:12:39)</em></p>
+<p>GLSL 是 OpenGL Shading Language。Shader 虽然运行在 GPU，但创建过程与 CPU 程序类似：</p>
+<ol>
+<li>创建 Shader 对象；</li>
+<li>提交源码；</li>
+<li>编译 Shader；</li>
+<li>检查编译状态；</li>
+<li>读取错误日志；</li>
+<li>创建 Program；</li>
+<li>附加顶点与片元 Shader；</li>
+<li>链接 Program；</li>
+<li>检查链接状态；</li>
+<li>分离并删除临时 Shader。</li>
+</ol>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[glCreateShader Vertex] --&gt; B[glShaderSource]
+    B --&gt; C[glCompileShader]
+    C --&gt; D{编译成功?}
+    D -- 否 --&gt; E[读取 InfoLog]
+    D -- 是 --&gt; F[创建 Fragment Shader]
+    F --&gt; G[编译 Fragment]
+    G --&gt; H[glCreateProgram]
+    H --&gt; I[Attach + Link]
+    I --&gt; J{链接成功?}
+    J -- 否 --&gt; K[读取 Program InfoLog]
+    J -- 是 --&gt; L[Detach / Delete Shader]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_14_00.png" alt="Shader 需要先分别编译，再链接为 GPU Program" loading="lazy">
+  <p class="video-caption">📷 Shader 需要先分别编译，再链接为 GPU Program<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=840" target="_blank" rel="noopener">回到原视频 (00:14:00)</a></p>
+</div>
+
+<h2 id="5-shader">5. 编译顶点 Shader</h2>
+<p><em>(参考时间: 00:15:20)</em></p>
+<p>创建顶点 Shader：</p>
+<div class="highlight"><pre><span></span><code><span class="n">GLuint</span><span class="w"> </span><span class="n">vertexShader</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">glCreateShader</span><span class="p">(</span><span class="n">GL_VERTEX_SHADER</span><span class="p">);</span>
+
+<span class="k">const</span><span class="w"> </span><span class="n">GLchar</span><span class="o">*</span><span class="w"> </span><span class="n">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vertexSrc</span><span class="p">.</span><span class="n">c_str</span><span class="p">();</span>
+
+<span class="n">glShaderSource</span><span class="p">(</span>
+<span class="w">    </span><span class="n">vertexShader</span><span class="p">,</span>
+<span class="w">    </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">    </span><span class="o">&amp;</span><span class="n">source</span><span class="p">,</span>
+<span class="w">    </span><span class="mi">0</span><span class="p">);</span>
+
+<span class="n">glCompileShader</span><span class="p">(</span><span class="n">vertexShader</span><span class="p">);</span>
+</code></pre></div>
+
+<p>检查编译结果：</p>
+<div class="highlight"><pre><span></span><code><span class="n">GLint</span><span class="w"> </span><span class="n">isCompiled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="n">glGetShaderiv</span><span class="p">(</span>
+<span class="w">    </span><span class="n">vertexShader</span><span class="p">,</span>
+<span class="w">    </span><span class="n">GL_COMPILE_STATUS</span><span class="p">,</span>
+<span class="w">    </span><span class="o">&amp;</span><span class="n">isCompiled</span><span class="p">);</span>
+</code></pre></div>
+
+<p>如果失败：</p>
+<div class="highlight"><pre><span></span><code><span class="n">GLint</span><span class="w"> </span><span class="n">maxLength</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="n">glGetShaderiv</span><span class="p">(</span>
+<span class="w">    </span><span class="n">vertexShader</span><span class="p">,</span>
+<span class="w">    </span><span class="n">GL_INFO_LOG_LENGTH</span><span class="p">,</span>
+<span class="w">    </span><span class="o">&amp;</span><span class="n">maxLength</span><span class="p">);</span>
+
+<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">GLchar</span><span class="o">&gt;</span><span class="w"> </span><span class="n">infoLog</span><span class="p">(</span><span class="n">maxLength</span><span class="p">);</span>
+<span class="n">glGetShaderInfoLog</span><span class="p">(</span>
+<span class="w">    </span><span class="n">vertexShader</span><span class="p">,</span>
+<span class="w">    </span><span class="n">maxLength</span><span class="p">,</span>
+<span class="w">    </span><span class="o">&amp;</span><span class="n">maxLength</span><span class="p">,</span>
+<span class="w">    </span><span class="n">infoLog</span><span class="p">.</span><span class="n">data</span><span class="p">());</span>
+
+<span class="n">glDeleteShader</span><span class="p">(</span><span class="n">vertexShader</span><span class="p">);</span>
+
+<span class="n">HZ_CORE_ERROR</span><span class="p">(</span><span class="s">"{0}"</span><span class="p">,</span><span class="w"> </span><span class="n">infoLog</span><span class="p">.</span><span class="n">data</span><span class="p">());</span>
+<span class="n">HZ_CORE_ASSERT</span><span class="p">(</span>
+<span class="w">    </span><span class="nb">false</span><span class="p">,</span>
+<span class="w">    </span><span class="s">"Vertex shader compilation failure!"</span><span class="p">);</span>
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_20_00.png" alt="顶点 Shader 编译失败时读取 InfoLog 并断言" loading="lazy">
+  <p class="video-caption">📷 顶点 Shader 编译失败时读取 InfoLog 并断言<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=1200" target="_blank" rel="noopener">回到原视频 (00:20:00)</a></p>
+</div>
+
+<h2 id="6-shader">6. 编译片元 Shader</h2>
+<p>片元 Shader 使用相同的编译流程，只是类型改为：</p>
+<div class="highlight"><pre><span></span><code><span class="n">GLuint</span><span class="w"> </span><span class="n">fragmentShader</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">glCreateShader</span><span class="p">(</span><span class="n">GL_FRAGMENT_SHADER</span><span class="p">);</span>
+</code></pre></div>
+
+<p>如果片元 Shader 编译失败，需要同时删除：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glDeleteShader</span><span class="p">(</span><span class="n">fragmentShader</span><span class="p">);</span>
+<span class="n">glDeleteShader</span><span class="p">(</span><span class="n">vertexShader</span><span class="p">);</span>
+</code></pre></div>
+
+<p>因为顶点 Shader 已经成功创建，但整个 Shader Program 无法继续构建，必须避免资源泄漏。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Vertex Shader] --&gt; B{编译成功?}
+    B -- 否 --&gt; C[删除 Vertex 并报错]
+    B -- 是 --&gt; D[Fragment Shader]
+    D --&gt; E{编译成功?}
+    E -- 否 --&gt; F[删除 Fragment 与 Vertex]
+    E -- 是 --&gt; G[链接 Program]
+</code></pre></div>
+
+<h2 id="7-shader-program">7. 链接 Shader Program</h2>
+<p><em>(参考时间: 00:22:20)</em></p>
+<p>创建程序对象：</p>
+<div class="highlight"><pre><span></span><code><span class="n">m_RendererID</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">glCreateProgram</span><span class="p">();</span>
+<span class="n">GLuint</span><span class="w"> </span><span class="n">program</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">m_RendererID</span><span class="p">;</span>
+</code></pre></div>
+
+<p>附加并链接：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glAttachShader</span><span class="p">(</span><span class="n">program</span><span class="p">,</span><span class="w"> </span><span class="n">vertexShader</span><span class="p">);</span>
+<span class="n">glAttachShader</span><span class="p">(</span><span class="n">program</span><span class="p">,</span><span class="w"> </span><span class="n">fragmentShader</span><span class="p">);</span>
+<span class="n">glLinkProgram</span><span class="p">(</span><span class="n">program</span><span class="p">);</span>
+</code></pre></div>
+
+<p>检查链接状态：</p>
+<div class="highlight"><pre><span></span><code><span class="n">GLint</span><span class="w"> </span><span class="n">isLinked</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="n">glGetProgramiv</span><span class="p">(</span>
+<span class="w">    </span><span class="n">program</span><span class="p">,</span>
+<span class="w">    </span><span class="n">GL_LINK_STATUS</span><span class="p">,</span>
+<span class="w">    </span><span class="o">&amp;</span><span class="n">isLinked</span><span class="p">);</span>
+</code></pre></div>
+
+<p>失败时：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glDeleteProgram</span><span class="p">(</span><span class="n">program</span><span class="p">);</span>
+<span class="n">glDeleteShader</span><span class="p">(</span><span class="n">vertexShader</span><span class="p">);</span>
+<span class="n">glDeleteShader</span><span class="p">(</span><span class="n">fragmentShader</span><span class="p">);</span>
+
+<span class="n">HZ_CORE_ERROR</span><span class="p">(</span><span class="s">"{0}"</span><span class="p">,</span><span class="w"> </span><span class="n">infoLog</span><span class="p">.</span><span class="n">data</span><span class="p">());</span>
+<span class="n">HZ_CORE_ASSERT</span><span class="p">(</span>
+<span class="w">    </span><span class="nb">false</span><span class="p">,</span>
+<span class="w">    </span><span class="s">"Shader link failure!"</span><span class="p">);</span>
+</code></pre></div>
+
+<p>成功时：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glDetachShader</span><span class="p">(</span><span class="n">program</span><span class="p">,</span><span class="w"> </span><span class="n">vertexShader</span><span class="p">);</span>
+<span class="n">glDetachShader</span><span class="p">(</span><span class="n">program</span><span class="p">,</span><span class="w"> </span><span class="n">fragmentShader</span><span class="p">);</span>
+</code></pre></div>
+
+<p>链接完成后，Shader Program 已经持有编译结果，可以分离并删除独立的 Shader 对象。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant C as Shader class
+    participant GL as OpenGL
+
+    C-&gt;&gt;GL: glCreateProgram
+    C-&gt;&gt;GL: Attach vertex/fragment
+    C-&gt;&gt;GL: glLinkProgram
+    GL--&gt;&gt;C: Link status
+    C-&gt;&gt;GL: Detach shaders
+    C--&gt;&gt;C: keep program ID
+</code></pre></div>
+
+<h2 id="8-shader">8. Shader 类接口</h2>
+<p><em>(参考时间: 00:24:00)</em></p>
+<p>新增：</p>
+<div class="highlight"><pre><span></span><code>Hazel/src/Hazel/Renderer/Shader.h
+Hazel/src/Hazel/Renderer/Shader.cpp
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="cp">#pragma once</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">Hazel</span><span class="w"> </span><span class="p">{</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Shader</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">Shader</span><span class="p">(</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">vertexSrc</span><span class="p">,</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">fragmentSrc</span><span class="p">);</span>
+<span class="w">    </span><span class="o">~</span><span class="n">Shader</span><span class="p">();</span>
+
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">Bind</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">Unbind</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="p">;</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">m_RendererID</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="p">}</span>
+</code></pre></div>
+
+<p><code>m_RendererID</code> 保存 OpenGL Shader Program 的句柄。</p>
+<p>绑定和解除绑定：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">Shader::Bind</span><span class="p">()</span><span class="w"> </span><span class="k">const</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glUseProgram</span><span class="p">(</span><span class="n">m_RendererID</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">Shader::Unbind</span><span class="p">()</span><span class="w"> </span><span class="k">const</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glUseProgram</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>析构时删除 Program：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Shader</span><span class="o">::~</span><span class="n">Shader</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glDeleteProgram</span><span class="p">(</span><span class="n">m_RendererID</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>classDiagram
+    class Shader {
+        -uint32_t m_RendererID
+        +Shader(vertexSrc, fragmentSrc)
+        +Bind()
+        +Unbind()
+        +~Shader()
+    }
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_24_00.png" alt="Shader.h 定义构造函数、析构函数、Bind/Unbind 和 RendererID" loading="lazy">
+  <p class="video-caption">📷 Shader.h 定义构造函数、析构函数、Bind/Unbind 和 RendererID<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=1440" target="_blank" rel="noopener">回到原视频 (00:24:00)</a></p>
+</div>
+
+<h2 id="9-application-shader">9. 在 Application 中创建 Shader</h2>
+<p><em>(参考时间: 00:27:19)</em></p>
+<p>当前还没有完整 Renderer 架构，因此先临时把 Shader 放在 Application：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"Hazel/Renderer/Shader.h"</span>
+
+<span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">Shader</span><span class="o">&gt;</span><span class="w"> </span><span class="n">m_Shader</span><span class="p">;</span>
+</code></pre></div>
+
+<p>创建：</p>
+<div class="highlight"><pre><span></span><code><span class="n">m_Shader</span><span class="p">.</span><span class="n">reset</span><span class="p">(</span>
+<span class="w">    </span><span class="k">new</span><span class="w"> </span><span class="n">Shader</span><span class="p">(</span><span class="n">vertexSrc</span><span class="p">,</span><span class="w"> </span><span class="n">fragmentSrc</span><span class="p">));</span>
+</code></pre></div>
+
+<p>绘制前绑定：</p>
+<div class="highlight"><pre><span></span><code><span class="n">m_Shader</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+
+<span class="n">glBindVertexArray</span><span class="p">(</span><span class="n">m_VertexArray</span><span class="p">);</span>
+<span class="n">glDrawElements</span><span class="p">(</span>
+<span class="w">    </span><span class="n">GL_TRIANGLES</span><span class="p">,</span>
+<span class="w">    </span><span class="mi">3</span><span class="p">,</span>
+<span class="w">    </span><span class="n">GL_UNSIGNED_INT</span><span class="p">,</span>
+<span class="w">    </span><span class="nb">nullptr</span><span class="p">);</span>
+</code></pre></div>
+
+<p>虽然 OpenGL 只要求 Shader 在 draw call 前绑定，但这里把 <code>Bind()</code> 放在绘制流程开头，更接近 DirectX 等 API 的显式状态要求。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_27_19.png" alt="Application 暂时持有 Shader 并在 Draw Call 前绑定" loading="lazy">
+  <p class="video-caption">📷 Application 暂时持有 Shader 并在 Draw Call 前绑定<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=1639" target="_blank" rel="noopener">回到原视频 (00:27:19)</a></p>
+</div>
+
+<h2 id="10-raw-string-glsl">10. 使用 Raw String 编写 GLSL</h2>
+<p><em>(参考时间: 00:29:35)</em></p>
+<p>普通 C++ 字符串需要逐行拼接和转义：</p>
+<div class="highlight"><pre><span></span><code><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">src</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="s">"#version 330 core</span><span class="se">\n</span><span class="s">"</span>
+<span class="w">    </span><span class="s">"layout(location = 0) in vec3 a_Position;</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+</code></pre></div>
+
+<p>不方便直接粘贴多行 Shader。</p>
+<p>C++11 Raw String 可以保留原始换行：</p>
+<div class="highlight"><pre><span></span><code><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">vertexSrc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="sa">R</span><span class="s">"</span><span class="dl">(</span>
+<span class="s">    #version 330 core</span>
+
+<span class="s">    layout(location = 0) in vec3 a_Position;</span>
+
+<span class="s">    void main()</span>
+<span class="s">    {</span>
+<span class="s">        gl_Position = vec4(a_Position, 1.0);</span>
+<span class="s">    }</span>
+<span class="dl">)</span><span class="s">"</span><span class="p">;</span>
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>graph LR
+    A[普通字符串] --&gt; B[每行引号 + \\n]
+    C[Raw String] --&gt; D[保留多行与缩进]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_29_40.png" alt="Raw String 让 GLSL 可以按原始格式粘贴到 C++" loading="lazy">
+  <p class="video-caption">📷 Raw String 让 GLSL 可以按原始格式粘贴到 C++<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=1780" target="_blank" rel="noopener">回到原视频 (00:29:40)</a></p>
+</div>
+
+<h2 id="11-shader">11. 编写顶点与片元 Shader</h2>
+<p>顶点 Shader：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#version 330 core</span>
+
+<span class="k">layout</span><span class="p">(</span><span class="n">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mo">0</span><span class="p">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="kt">vec3</span><span class="w"> </span><span class="n">a_Position</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="n">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="nb">gl_Position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">vec4</span><span class="p">(</span><span class="n">a_Position</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>片元 Shader：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#version 330 core</span>
+
+<span class="k">layout</span><span class="p">(</span><span class="n">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mo">0</span><span class="p">)</span><span class="w"> </span><span class="k">out</span><span class="w"> </span><span class="kt">vec4</span><span class="w"> </span><span class="n">color</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="n">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">vec4</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>命名约定：</p>
+<ul>
+<li><code>a_</code> 表示输入 Attribute；</li>
+<li><code>v_</code> 表示在 Shader 之间传递的 Varying 变量；</li>
+<li><code>gl_Position</code> 是顶点 Shader 的内建裁剪空间输出；</li>
+<li>颜色使用 RGBA 四分量向量。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[a_Position] --&gt; B[Vertex Shader]
+    B --&gt; C[gl_Position]
+    B --&gt; D[v_Position]
+    D --&gt; E[Fragment Shader]
+    E --&gt; F[color]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_32_00.png" alt="第一对 Shader 分别处理顶点位置与输出颜色" loading="lazy">
+  <p class="video-caption">📷 第一对 Shader 分别处理顶点位置与输出颜色<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=1920" target="_blank" rel="noopener">回到原视频 (00:32:00)</a></p>
+</div>
+
+<h2 id="12">12. 绘制红色三角形</h2>
+<p><em>(参考时间: 00:33:52)</em></p>
+<p>程序运行后，之前没有 Shader 的白色三角形变为纯红色。</p>
+<p>这说明：</p>
+<ul>
+<li>两个 Shader 编译成功；</li>
+<li>Program 链接成功；</li>
+<li><code>Bind()</code> 正确设置了当前 GPU Program；</li>
+<li>Draw Call 使用了新的 Shader 输出。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Vertex Shader] --&gt; B[裁剪空间三角形]
+    B --&gt; C[光栅化]
+    C --&gt; D[Fragment Shader]
+    D --&gt; E[红色像素]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_33_57.png" alt="第一个自定义 Shader 成功输出红色三角形" loading="lazy">
+  <p class="video-caption">📷 第一个自定义 Shader 成功输出红色三角形<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=2037" target="_blank" rel="noopener">回到原视频 (00:33:57)</a></p>
+</div>
+
+<h2 id="13-shader">13. 在顶点 Shader 中平移三角形</h2>
+<p><em>(参考时间: 00:34:50)</em></p>
+<p>修改：</p>
+<div class="highlight"><pre><span></span><code><span class="nb">gl_Position</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="kt">vec4</span><span class="p">(</span><span class="n">a_Position</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+</code></pre></div>
+
+<p>会把三个顶点整体向正 X、正 Y 平移，因此三角形移动到右上角。</p>
+<p>这验证了顶点 Shader 的核心职责：把输入顶点转换成希望显示的裁剪空间位置。</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// 原始位置</span>
+<span class="nb">gl_Position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">vec4</span><span class="p">(</span><span class="n">a_Position</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+
+<span class="c1">// 平移</span>
+<span class="nb">gl_Position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">vec4</span><span class="p">(</span><span class="n">a_Position</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_34_54.png" alt="顶点 Shader 平移顶点后三角形移动到屏幕右上角" loading="lazy">
+  <p class="video-caption">📷 顶点 Shader 平移顶点后三角形移动到屏幕右上角<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=2094" target="_blank" rel="noopener">回到原视频 (00:34:54)</a></p>
+</div>
+
+<h2 id="14-shader">14. Shader 之间的数据传递</h2>
+<p><em>(参考时间: 00:36:00)</em></p>
+<p>顶点 Shader 可以输出可变变量：</p>
+<div class="highlight"><pre><span></span><code><span class="k">out</span><span class="w"> </span><span class="kt">vec3</span><span class="w"> </span><span class="n">v_Position</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="n">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">v_Position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a_Position</span><span class="p">;</span>
+<span class="w">    </span><span class="nb">gl_Position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">vec4</span><span class="p">(</span><span class="n">a_Position</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>片元 Shader 使用相同名称接收：</p>
+<div class="highlight"><pre><span></span><code><span class="k">in</span><span class="w"> </span><span class="kt">vec3</span><span class="w"> </span><span class="n">v_Position</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="n">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">vec4</span><span class="p">(</span><span class="n">v_Position</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>变量名和类型必须对应。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant V as Vertex Shader
+    participant R as Rasterizer
+    participant F as Fragment Shader
+
+    V-&gt;&gt;R: v_Position per vertex
+    R-&gt;&gt;F: interpolated v_Position per fragment
+    F-&gt;&gt;F: use v_Position as color
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_36_00.png" alt="通过同名的 out/in 变量把位置数据传递到片元 Shader" loading="lazy">
+  <p class="video-caption">📷 通过同名的 out/in 变量把位置数据传递到片元 Shader<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=2160" target="_blank" rel="noopener">回到原视频 (00:36:00)</a></p>
+</div>
+
+<h2 id="15">15. 为什么会出现黑色区域</h2>
+<p><em>(参考时间: 00:37:27)</em></p>
+<p>顶点位置范围是：</p>
+<div class="highlight"><pre><span></span><code>-1 到 +1
+</code></pre></div>
+
+<p>颜色通道通常被限制在：</p>
+<div class="highlight"><pre><span></span><code>0 到 1
+</code></pre></div>
+
+<p>如果把负坐标直接作为颜色：</p>
+<div class="highlight"><pre><span></span><code><span class="n">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">vec4</span><span class="p">(</span><span class="n">v_Position</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+</code></pre></div>
+
+<p>负值会被截断为 <code>0</code>，表现为黑色。</p>
+<p>转换到 <code>0..1</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="n">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">vec4</span><span class="p">(</span>
+<span class="w">    </span><span class="n">v_Position</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">0.5</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span>
+<span class="w">    </span><span class="mf">1.0</span><span class="p">);</span>
+</code></pre></div>
+
+<p>映射关系：</p>
+<div class="highlight"><pre><span></span><code>-1.0 -&gt; 0.0
+ 0.0 -&gt; 0.5
++1.0 -&gt; 1.0
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[-1.0] --&gt; B[0.0]
+    C[0.0] --&gt; D[0.5]
+    E[+1.0] --&gt; F[1.0]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_37_27.png" alt="通过乘以 0.5 再加 0.5，把位置范围映射到颜色范围" loading="lazy">
+  <p class="video-caption">📷 通过乘以 0.5 再加 0.5，把位置范围映射到颜色范围<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=2247" target="_blank" rel="noopener">回到原视频 (00:37:27)</a></p>
+</div>
+
+<h2 id="16">16. 颜色插值与坐标轴</h2>
+<p><em>(参考时间: 00:38:11)</em></p>
+<p>顶点之间会进行线性插值：</p>
+<div class="highlight"><pre><span></span><code>左顶点: 负值
+中 间: 接近 0
+右顶点: 正值
+</code></pre></div>
+
+<p>所以最终颜色会在三角形内部平滑变化。</p>
+<p>坐标轴与 RGB 对应：</p>
+<table>
+<thead>
+<tr>
+<th>坐标</th>
+<th>颜色通道</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>x</td>
+<td>red</td>
+</tr>
+<tr>
+<td>y</td>
+<td>green</td>
+</tr>
+<tr>
+<td>z</td>
+<td>blue</td>
+</tr>
+</tbody>
+</table>
+<p>移动三角形或增加偏移后，可以看到红色与绿色分布变化。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[X 轴] --&gt; B[Red]
+    C[Y 轴] --&gt; D[Green]
+    E[Z 轴] --&gt; F[Blue]
+    B --&gt; G[Fragment 插值]
+    D --&gt; G
+    F --&gt; G
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_38_34.png" alt="颜色由顶点位置插值得到，形成平滑渐变三角形" loading="lazy">
+  <p class="video-caption">📷 颜色由顶点位置插值得到，形成平滑渐变三角形<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=2314" target="_blank" rel="noopener">回到原视频 (00:38:34)</a></p>
+</div>
+
+<h2 id="17-shader">17. Shader 生命周期与资源管理</h2>
+<p>当前 Shader 类已经处理：</p>
+<ul>
+<li>顶点编译失败时删除顶点 Shader；</li>
+<li>片元编译失败时删除两个 Shader；</li>
+<li>链接失败时删除 Program 和两个 Shader；</li>
+<li>链接成功后分离 Shader；</li>
+<li>析构时删除 Program。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Vertex compile] --&gt; B{Fail?}
+    B -- 是 --&gt; C[Delete vertex]
+    B -- 否 --&gt; D[Fragment compile]
+    D --&gt; E{Fail?}
+    E -- 是 --&gt; F[Delete fragment + vertex]
+    E -- 否 --&gt; G{Link}
+    G -- Fail --&gt; H[Delete program + both shaders]
+    G -- Pass --&gt; I[Detach + keep program]
+    I --&gt; J[Destructor deletes program]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_26_30.png" alt="Shader 类在编译、链接和析构阶段处理 OpenGL 资源" loading="lazy">
+  <p class="video-caption">📷 Shader 类在编译、链接和析构阶段处理 OpenGL 资源<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=1590" target="_blank" rel="noopener">回到原视频 (00:26:30)</a></p>
+</div>
+
+<h2 id="18">18. 当前技术债</h2>
+<p><em>(参考时间: 00:41:37)</em></p>
+<p>虽然 Shader 类已经建立，但 Application 中仍然直接包含 OpenGL 代码：</p>
+<ul>
+<li><code>glGenVertexArrays</code>；</li>
+<li><code>glGenBuffers</code>；</li>
+<li><code>glBufferData</code>；</li>
+<li><code>glVertexAttribPointer</code>；</li>
+<li><code>glDrawElements</code>。</li>
+</ul>
+<p>这意味着跨平台 Application 仍直接依赖 OpenGL。</p>
+<p>下一阶段应把这些内容提取为：</p>
+<div class="highlight"><pre><span></span><code>Hazel/Renderer/VertexBuffer
+Hazel/Renderer/IndexBuffer
+Hazel/Renderer/VertexArray
+Hazel/Renderer/Shader
+
+Platform/OpenGL/OpenGLVertexBuffer
+Platform/OpenGL/OpenGLIndexBuffer
+Platform/OpenGL/OpenGLVertexArray
+</code></pre></div>
+
+<p>Renderer API 抽象的第一批实际类将从这里开始。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Application] --&gt; B[Renderer abstractions]
+    B --&gt; C[VertexBuffer]
+    B --&gt; D[IndexBuffer]
+    B --&gt; E[VertexArray]
+    B --&gt; F[Shader]
+    C --&gt; G[OpenGL implementations]
+    D --&gt; G
+    E --&gt; G
+    F --&gt; G
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_41_37.png" alt="下一步将把 Application 中的 GPU 资源操作提取为 API 专用类" loading="lazy">
+  <p class="video-caption">📷 下一步将把 Application 中的 GPU 资源操作提取为 API 专用类<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29&t=2497" target="_blank" rel="noopener">回到原视频 (00:41:37)</a></p>
+</div>
+
+<h2 id="19">19. 本节结论</h2>
+<p>本讲完成了 Hazel 的第一个 Shader 系统：</p>
+<ul>
+<li>解释 Vertex Shader 与 Fragment Shader 的职责；</li>
+<li>理解每个顶点与每个像素的执行模型；</li>
+<li>建立 Shader 编译、链接与错误检查流程；</li>
+<li>新增 <code>Shader</code> 类；</li>
+<li>使用 Raw String 编写 GLSL；</li>
+<li>在 Application 中临时创建和绑定 Shader；</li>
+<li>成功绘制红色三角形；</li>
+<li>验证顶点位置变换；</li>
+<li>通过 Varying 数据实现颜色插值；</li>
+<li>处理 Shader 资源的创建与释放；</li>
+<li>明确下一步需要抽象 VertexBuffer、IndexBuffer、VertexArray 等 OpenGL 类。</li>
+</ul>
+<p>Shader 让 Hazel 第一次真正使用 GPU 程序控制顶点与像素输出，也为后续材质、光照和 PBR 渲染奠定基础。</p>
+<h2 id="_2">附：参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=29">Bilibili 精译视频：029 - OpenGL 着色器</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/tree/76ae3b81">本期对应代码提交 <code>76ae3b81</code></a></li>
+<li><a href="https://www.khronos.org/opengl/wiki/Shader_Compilation">Khronos OpenGL Wiki：Shader Compilation</a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>
