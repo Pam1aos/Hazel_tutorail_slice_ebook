@@ -88,6 +88,10 @@
   - [Markdown 版本](<Hazel Game Engine/034 - Cameras and How They Work/book.md>)
   - 视频来源：[Bilibili 精译版第 34 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=34)
   - 主题：摄像机数据、View/Projection 矩阵、FOV 与宽高比、MVP 变换、场景 uniform 和正交相机规划
+- [035 - 创建正交相机](<Hazel Game Engine/035 - Creating an Orthographic Camera/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/035 - Creating an Orthographic Camera/book.md>)
+  - 视频来源：[Bilibili 精译版第 35 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=35)
+  - 主题：`OrthographicCamera`、View/Projection/VP、矩阵 uniform 上传、宽高比修复和相机变换调试
 
 ## 南京大学操作系统原理 2026
 

@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 035：创建正交相机</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: #f3f4f6; font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+            code { overflow-wrap: anywhere; word-break: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-035">Hazel 游戏引擎笔记 035：创建正交相机</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35">The Cherno 游戏引擎系列第 35 讲“创建正交相机”</a>，时长约 38 分 27 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。代码参考提交：<a href="https://github.com/TheCherno/Hazel/tree/c1d915e"><code>c1d915e</code></a>。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材；术语和代码以原视频及同期 Hazel 仓库为准。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>第 34 讲已经规划了 Camera、View、Projection 与 Renderer 的数据流。本讲把这些设计真正写进 Hazel：</p>
+<ul>
+<li>创建 <code>OrthographicCamera</code>；</li>
+<li>使用 <code>glm::ortho()</code> 构造投影矩阵；</li>
+<li>用位置和 Z 轴旋转构造相机变换；</li>
+<li>从相机变换的逆得到 View 矩阵；</li>
+<li>缓存 ViewProjection 矩阵；</li>
+<li>在 Shader 中接收 <code>u_ViewProjection</code> uniform；</li>
+<li>为 Shader 增加 <code>UploadUniformMat4()</code>；</li>
+<li>把 Camera 参数加入 <code>Renderer::BeginScene()</code>；</li>
+<li>在 <code>Renderer::Submit()</code> 中绑定 Shader 并上传场景 uniform；</li>
+<li>修正窗口宽高比导致的物体拉伸；</li>
+<li>测试相机平移与旋转；</li>
+<li>定位 GLM 位置向量未初始化造成的空白画面。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[OrthographicCamera] --&gt; B[Projection Matrix]
+    A --&gt; C[View Matrix]
+    B --&gt; D[ViewProjection]
+    C --&gt; D
+    D --&gt; E[Renderer SceneData]
+    E --&gt; F[u_ViewProjection Uniform]
+    F --&gt; G[Vertex Shader]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_01_00.png" alt="上一讲已经建立 Renderer 流程，本讲开始实现相机类" loading="lazy">
+  <p class="video-caption">📷 上一讲已经建立 Renderer 流程，本讲开始实现相机类<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=60" target="_blank" rel="noopener">回到原视频 (00:01:00)</a></p>
+</div>
+
+<h2 id="1-orthographiccamera">1. OrthographicCamera 的类形态</h2>
+<p><em>(参考时间: 00:01:29)</em></p>
+<p>Hazel 明确区分不同相机类型，因此类名不是泛泛的 <code>Camera</code>，而是：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">OrthographicCamera</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">OrthographicCamera</span><span class="p">(</span>
+<span class="w">        </span><span class="kt">float</span><span class="w"> </span><span class="n">left</span><span class="p">,</span>
+<span class="w">        </span><span class="kt">float</span><span class="w"> </span><span class="n">right</span><span class="p">,</span>
+<span class="w">        </span><span class="kt">float</span><span class="w"> </span><span class="n">bottom</span><span class="p">,</span>
+<span class="w">        </span><span class="kt">float</span><span class="w"> </span><span class="n">top</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">glm</span><span class="o">::</span><span class="n">vec3</span><span class="o">&amp;</span><span class="w"> </span><span class="nf">GetPosition</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">SetPosition</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">glm</span><span class="o">::</span><span class="n">vec3</span><span class="o">&amp;</span><span class="w"> </span><span class="n">position</span><span class="p">);</span>
+
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="nf">GetRotation</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">SetRotation</span><span class="p">(</span><span class="kt">float</span><span class="w"> </span><span class="n">rotation</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">glm</span><span class="o">::</span><span class="n">mat4</span><span class="o">&amp;</span><span class="w"> </span><span class="nf">GetProjectionMatrix</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="p">;</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">glm</span><span class="o">::</span><span class="n">mat4</span><span class="o">&amp;</span><span class="w"> </span><span class="nf">GetViewMatrix</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="p">;</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">glm</span><span class="o">::</span><span class="n">mat4</span><span class="o">&amp;</span><span class="w"> </span><span class="nf">GetViewProjectionMatrix</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="p">;</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">RecalculateViewMatrix</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">glm</span><span class="o">::</span><span class="n">mat4</span><span class="w"> </span><span class="n">m_ProjectionMatrix</span><span class="p">;</span>
+<span class="w">    </span><span class="n">glm</span><span class="o">::</span><span class="n">mat4</span><span class="w"> </span><span class="n">m_ViewMatrix</span><span class="p">;</span>
+<span class="w">    </span><span class="n">glm</span><span class="o">::</span><span class="n">mat4</span><span class="w"> </span><span class="n">m_ViewProjectionMatrix</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">glm</span><span class="o">::</span><span class="n">vec3</span><span class="w"> </span><span class="n">m_Position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span><span class="w"> </span><span class="p">};</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">m_Rotation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>明确的类型名称也为未来的 <code>PerspectiveCamera</code> 留下空间。</p>
+<div class="highlight"><pre><span></span><code>classDiagram
+    class OrthographicCamera {
+        -mat4 m_ProjectionMatrix
+        -mat4 m_ViewMatrix
+        -mat4 m_ViewProjectionMatrix
+        -vec3 m_Position
+        -float m_Rotation
+        +SetPosition(vec3)
+        +SetRotation(float)
+        +GetProjectionMatrix()
+        +GetViewMatrix()
+        +GetViewProjectionMatrix()
+        -RecalculateViewMatrix()
+    }
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_01_37.png" alt="OrthographicCamera 头文件保存三个矩阵、位置和旋转" loading="lazy">
+  <p class="video-caption">📷 OrthographicCamera 头文件保存三个矩阵、位置和旋转<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=97" target="_blank" rel="noopener">回到原视频 (00:01:37)</a></p>
+</div>
+
+<h2 id="2-leftrightbottomtop">2. 构造参数：left、right、bottom、top</h2>
+<p><em>(参考时间: 00:02:20)</em></p>
+<p>正交投影不是根据 FOV 生成视锥，而是定义视口中的世界空间矩形：</p>
+<div class="highlight"><pre><span></span><code>left / right / bottom / top
+</code></pre></div>
+
+<p>这个矩形内的坐标会映射到屏幕。矩形越宽，同样大小的物体在屏幕上越小。</p>
+<p>当前 <code>glm::ortho()</code> 还使用固定 Near/Far：</p>
+<div class="highlight"><pre><span></span><code>near = -1.0
+far  =  1.0
+</code></pre></div>
+
+<p>对于当前 2D 内容已经足够。未来可以扩展构造参数，把 Near/Far 暴露给上层。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Orthographic Bounds] --&gt; B[Left]
+    A --&gt; C[Right]
+    A --&gt; D[Bottom]
+    A --&gt; E[Top]
+    A --&gt; F[Near -1]
+    A --&gt; G[Far +1]
+    B --&gt; H[glm::ortho]
+    C --&gt; H
+    D --&gt; H
+    E --&gt; H
+    F --&gt; H
+    G --&gt; H
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_02_20.png" alt="正交相机通过左右上下边界定义可见矩形" loading="lazy">
+  <p class="video-caption">📷 正交相机通过左右上下边界定义可见矩形<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=140" target="_blank" rel="noopener">回到原视频 (00:02:20)</a></p>
+</div>
+
+<h2 id="3-viewprojection">3. 为什么要缓存 ViewProjection</h2>
+<p><em>(参考时间: 00:05:03)</em></p>
+<p>Projection 与 View 需要分别保留，因为未来光照、调试或投影反算可能需要单独矩阵。</p>
+<p>但每帧、每个对象都会使用 ViewProjection：</p>
+<div class="highlight"><pre><span></span><code>viewProjection = projection * view
+</code></pre></div>
+
+<p>如果每次调用都重新相乘，会产生重复工作。因此类中多缓存一个 4×4 矩阵，约多占 64 字节，却能让 Renderer 直接取得结果。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[Projection] --&gt; C[ViewProjection]
+    B[View] --&gt; C
+    C --&gt; D[Cached mat4]
+    D --&gt; E[Renderer BeginScene]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_05_03.png" alt="缓存 VP 矩阵避免每帧重复相乘" loading="lazy">
+  <p class="video-caption">📷 缓存 VP 矩阵避免每帧重复相乘<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=303" target="_blank" rel="noopener">回到原视频 (00:05:03)</a></p>
+</div>
+
+<h2 id="4-position-z">4. Position 与 Z 轴旋转</h2>
+<p><em>(参考时间: 00:03:29)</em></p>
+<p>正交相机保存：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glm</span><span class="o">::</span><span class="n">vec3</span><span class="w"> </span><span class="n">m_Position</span><span class="p">;</span>
+<span class="kt">float</span><span class="w"> </span><span class="n">m_Rotation</span><span class="p">;</span>
+</code></pre></div>
+
+<p>这里的旋转是一个 <code>float</code>，表示绕 Z 轴的 2D 旋转，而不是欧拉角或四元数。</p>
+<p>当前 Hazel 主要绘制 2D 场景，绕 X/Y 旋转会让平面物体离开正交相机可理解的范围。未来做 3D 时，Perspective Camera 会使用完整朝向表示。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[OrthographicCamera Transform] --&gt; B[Position XYZ]
+    A --&gt; C[Rotation around Z]
+    B --&gt; D[Translation Matrix]
+    C --&gt; E[Rotation Matrix]
+    D --&gt; F[Camera Transform]
+    E --&gt; F
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_03_29.png" alt="2D 正交相机只需要位置与 Z 轴旋转" loading="lazy">
+  <p class="video-caption">📷 2D 正交相机只需要位置与 Z 轴旋转<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=209" target="_blank" rel="noopener">回到原视频 (00:03:29)</a></p>
+</div>
+
+<h2 id="5-setposition-setrotation">5. SetPosition / SetRotation 自动重算</h2>
+<p><em>(参考时间: 00:07:18)</em></p>
+<p>改变位置或旋转后，View 与 ViewProjection 不能继续保持旧值：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">SetPosition</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">glm</span><span class="o">::</span><span class="n">vec3</span><span class="o">&amp;</span><span class="w"> </span><span class="n">position</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">m_Position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">position</span><span class="p">;</span>
+<span class="w">    </span><span class="n">RecalculateViewMatrix</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">SetRotation</span><span class="p">(</span><span class="kt">float</span><span class="w"> </span><span class="n">rotation</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">m_Rotation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rotation</span><span class="p">;</span>
+<span class="w">    </span><span class="n">RecalculateViewMatrix</span><span class="p">();</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这里选择“变更即重算”。另一种做法是使用显式 <code>OnUpdate()</code> 或在帧末统一更新矩阵，但当前相机变化频率较低，直接重算更简单，也能避免忘记刷新状态。</p>
+<div class="highlight"><pre><span></span><code>stateDiagram-v2
+    [*] --&gt; CameraReady
+    CameraReady --&gt; PositionChanged: SetPosition
+    PositionChanged --&gt; RecalculateView
+    CameraReady --&gt; RotationChanged: SetRotation
+    RotationChanged --&gt; RecalculateView
+    RecalculateView --&gt; CameraReady
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_07_18.png" alt="Position 与 Rotation 修改后立即重算相机矩阵" loading="lazy">
+  <p class="video-caption">📷 Position 与 Rotation 修改后立即重算相机矩阵<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=438" target="_blank" rel="noopener">回到原视频 (00:07:18)</a></p>
+</div>
+
+<h2 id="6-projection-view">6. 构造 Projection 与初始 View</h2>
+<p><em>(参考时间: 00:09:23)</em></p>
+<p>构造函数实现：</p>
+<div class="highlight"><pre><span></span><code><span class="n">OrthographicCamera</span><span class="o">::</span><span class="n">OrthographicCamera</span><span class="p">(</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">left</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">right</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">bottom</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">top</span><span class="p">)</span>
+<span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="n">m_ProjectionMatrix</span><span class="p">(</span>
+<span class="w">        </span><span class="n">glm</span><span class="o">::</span><span class="n">ortho</span><span class="p">(</span><span class="n">left</span><span class="p">,</span><span class="w"> </span><span class="n">right</span><span class="p">,</span><span class="w"> </span><span class="n">bottom</span><span class="p">,</span><span class="w"> </span><span class="n">top</span><span class="p">,</span><span class="w"> </span><span class="mf">-1.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0f</span><span class="p">)),</span>
+<span class="w">      </span><span class="n">m_ViewMatrix</span><span class="p">(</span><span class="mf">1.0f</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">m_ViewProjectionMatrix</span><span class="w"> </span><span class="o">=</span>
+<span class="w">        </span><span class="n">m_ProjectionMatrix</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">m_ViewMatrix</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>两个关键点：</p>
+<ul>
+<li><code>m_ViewMatrix(1.0f)</code> 明确构造单位矩阵；</li>
+<li>构造函数中也计算一次 VP，保证对象从创建起就处于可用状态。</li>
+</ul>
+<p>不能依赖 ViewProjection 的默认值。未初始化的矩阵可能包含任意数字，第一次绘制就会出现不可预测画面。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant App
+    participant Cam as OrthographicCamera
+    App-&gt;&gt;Cam: Construct(left,right,bottom,top)
+    Cam-&gt;&gt;Cam: glm::ortho(...)
+    Cam-&gt;&gt;Cam: View = Identity
+    Cam-&gt;&gt;Cam: VP = Projection * View
+    Cam--&gt;&gt;App: Valid camera
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_09_23.png" alt="构造函数生成正交投影并初始化有效 VP 矩阵" loading="lazy">
+  <p class="video-caption">📷 构造函数生成正交投影并初始化有效 VP 矩阵<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=563" target="_blank" rel="noopener">回到原视频 (00:09:23)</a></p>
+</div>
+
+<h2 id="7-recalculateviewmatrix">7. RecalculateViewMatrix 的推导</h2>
+<p><em>(参考时间: 00:11:07)</em></p>
+<p>相机自身变换由平移和旋转组成：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glm</span><span class="o">::</span><span class="n">mat4</span><span class="w"> </span><span class="n">transform</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">glm</span><span class="o">::</span><span class="n">translate</span><span class="p">(</span><span class="n">glm</span><span class="o">::</span><span class="n">mat4</span><span class="p">(</span><span class="mf">1.0f</span><span class="p">),</span><span class="w"> </span><span class="n">m_Position</span><span class="p">)</span><span class="w"> </span><span class="o">*</span>
+<span class="w">    </span><span class="n">glm</span><span class="o">::</span><span class="n">rotate</span><span class="p">(</span>
+<span class="w">        </span><span class="n">glm</span><span class="o">::</span><span class="n">mat4</span><span class="p">(</span><span class="mf">1.0f</span><span class="p">),</span>
+<span class="w">        </span><span class="n">glm</span><span class="o">::</span><span class="n">radians</span><span class="p">(</span><span class="n">m_Rotation</span><span class="p">),</span>
+<span class="w">        </span><span class="n">glm</span><span class="o">::</span><span class="n">vec3</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">));</span>
+</code></pre></div>
+
+<p>然后取逆：</p>
+<div class="highlight"><pre><span></span><code><span class="n">m_ViewMatrix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">glm</span><span class="o">::</span><span class="n">inverse</span><span class="p">(</span><span class="n">transform</span><span class="p">);</span>
+<span class="n">m_ViewProjectionMatrix</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">m_ProjectionMatrix</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">m_ViewMatrix</span><span class="p">;</span>
+</code></pre></div>
+
+<p>顺序必须先平移后旋转：</p>
+<div class="highlight"><pre><span></span><code>T * R
+</code></pre></div>
+
+<p>如果改成 <code>R * T</code>，相机会围绕世界原点旋转后再平移，运动轨迹会完全不同。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Identity] --&gt; B[Translate by Position]
+    B --&gt; C[Rotate around Z]
+    C --&gt; D[Camera Transform T*R]
+    D --&gt; E[Inverse]
+    E --&gt; F[View Matrix]
+    F --&gt; G[Projection * View]
+    G --&gt; H[ViewProjection]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_11_07.png" alt="相机变换按 T*R 组合，取逆后得到 View 矩阵" loading="lazy">
+  <p class="video-caption">📷 相机变换按 T*R 组合，取逆后得到 View 矩阵<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=667" target="_blank" rel="noopener">回到原视频 (00:11:07)</a></p>
+</div>
+
+<h2 id="8-glm-vp">8. GLM 列主序下的 VP 乘法</h2>
+<p><em>(参考时间: 00:13:34)</em></p>
+<p>代码写作：</p>
+<div class="highlight"><pre><span></span><code><span class="n">m_ViewProjectionMatrix</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">m_ProjectionMatrix</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">m_ViewMatrix</span><span class="p">;</span>
+</code></pre></div>
+
+<p>虽然变量名是 ViewProjection，乘法顺序却必须让 Projection 在左、View 在右。</p>
+<p>GLM 为 OpenGL 提供列主序矩阵，正确形式是：</p>
+<div class="highlight"><pre><span></span><code>P * V * M * vertex
+</code></pre></div>
+
+<p>如果写成 <code>View * Projection</code>，平移和投影的顺序会颠倒，画面通常完全错误。</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[Vertex] --&gt; B[Model]
+    B --&gt; C[View]
+    C --&gt; D[Projection]
+    D --&gt; E[Clip Position]
+    F[Code: Projection * View] --&gt; D
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_13_34.png" alt="列主序下 VP 必须按 Projection * View 计算" loading="lazy">
+  <p class="video-caption">📷 列主序下 VP 必须按 Projection * View 计算<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=814" target="_blank" rel="noopener">回到原视频 (00:13:34)</a></p>
+</div>
+
+<h2 id="9-application">9. Application 持有正交相机</h2>
+<p><em>(参考时间: 00:14:40)</em></p>
+<p>Application 增加成员：</p>
+<div class="highlight"><pre><span></span><code><span class="n">OrthographicCamera</span><span class="w"> </span><span class="n">m_Camera</span><span class="p">;</span>
+</code></pre></div>
+
+<p>构造函数初始化：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Application</span><span class="o">::</span><span class="n">Application</span><span class="p">()</span>
+<span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="n">m_Camera</span><span class="p">(</span><span class="mf">-1.6f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.6f</span><span class="p">,</span><span class="w"> </span><span class="mf">-0.9f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.9f</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这组边界形成 16:9 的宽高比：</p>
+<div class="highlight"><pre><span></span><code>(1.6 - -1.6) / (0.9 - -0.9) = 3.2 / 1.8 = 16:9
+</code></pre></div>
+
+<p>相机作为值成员存在于 Application 中，不需要 <code>shared_ptr</code>。它跟随 Application 生命周期，Renderer 只在 BeginScene 时读取它。</p>
+<div class="highlight"><pre><span></span><code>classDiagram
+    class Application {
+        -OrthographicCamera m_Camera
+        +Run()
+    }
+    class OrthographicCamera
+    Application *-- OrthographicCamera
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_14_40.png" alt="Application 以值成员持有一个正交相机" loading="lazy">
+  <p class="video-caption">📷 Application 以值成员持有一个正交相机<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=880" target="_blank" rel="noopener">回到原视频 (00:14:40)</a></p>
+</div>
+
+<h2 id="10-shader-viewprojection-uniform">10. Shader 中的 ViewProjection uniform</h2>
+<p><em>(参考时间: 00:16:28)</em></p>
+<p>两个 Vertex Shader 都增加：</p>
+<div class="highlight"><pre><span></span><code><span class="k">uniform</span><span class="w"> </span><span class="kt">mat4</span><span class="w"> </span><span class="n">u_ViewProjection</span><span class="p">;</span>
+</code></pre></div>
+
+<p>顶点位置改为：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="n">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">v_Position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a_Position</span><span class="p">;</span>
+<span class="w">    </span><span class="n">v_Color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a_Color</span><span class="p">;</span>
+<span class="w">    </span><span class="nb">gl_Position</span><span class="w"> </span><span class="o">=</span>
+<span class="w">        </span><span class="n">u_ViewProjection</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="kt">vec4</span><span class="p">(</span><span class="n">a_Position</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><code>u_</code> 前缀只是命名约定，用来让 CPU 侧代码一眼识别 uniform。</p>
+<p>当前尚未加入 Model 矩阵，所以这里直接用 VP 变换对象顶点。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[CPU ViewProjection] --&gt; B[u_ViewProjection]
+    C[a_Position attribute] --&gt; D[vec4 position,1]
+    B --&gt; E[Matrix multiply]
+    D --&gt; E
+    E --&gt; F[gl_Position]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_16_28.png" alt="Vertex Shader 使用 u_ViewProjection 变换输入顶点" loading="lazy">
+  <p class="video-caption">📷 Vertex Shader 使用 u_ViewProjection 变换输入顶点<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=988" target="_blank" rel="noopener">回到原视频 (00:16:28)</a></p>
+</div>
+
+<h2 id="11-shader-uploaduniformmat4">11. Shader 添加 UploadUniformMat4</h2>
+<p><em>(参考时间: 00:18:36)</em></p>
+<p><code>Shader</code> 接口增加：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">UploadUniformMat4</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">name</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">glm</span><span class="o">::</span><span class="n">mat4</span><span class="o">&amp;</span><span class="w"> </span><span class="n">matrix</span><span class="p">);</span>
+</code></pre></div>
+
+<p>调用前必须已经绑定 Shader：</p>
+<div class="highlight"><pre><span></span><code><span class="n">shader</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="n">shader</span><span class="o">-&gt;</span><span class="n">UploadUniformMat4</span><span class="p">(</span>
+<span class="w">    </span><span class="s">"u_ViewProjection"</span><span class="p">,</span>
+<span class="w">    </span><span class="n">viewProjection</span><span class="p">);</span>
+</code></pre></div>
+
+<p>上传函数本身不再调用 <code>glUseProgram()</code>。一次绘制可能需要上传多个 uniforms，由调用方绑定一次 Shader 后集中上传更高效。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant R as Renderer
+    participant S as Shader
+    participant GL as OpenGL
+    R-&gt;&gt;S: Bind()
+    S-&gt;&gt;GL: glUseProgram(program)
+    R-&gt;&gt;S: UploadUniformMat4(name, matrix)
+    S-&gt;&gt;GL: glGetUniformLocation
+    S-&gt;&gt;GL: glUniformMatrix4fv
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_18_36.png" alt="Shader 暴露 Mat4 uniform 上传接口" loading="lazy">
+  <p class="video-caption">📷 Shader 暴露 Mat4 uniform 上传接口<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=1116" target="_blank" rel="noopener">回到原视频 (00:18:36)</a></p>
+</div>
+
+<h2 id="12-gluniformmatrix4fv">12. glUniformMatrix4fv 参数</h2>
+<p><em>(参考时间: 00:20:05)</em></p>
+<p>OpenGL 实现：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">Shader::UploadUniformMat4</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">name</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">glm</span><span class="o">::</span><span class="n">mat4</span><span class="o">&amp;</span><span class="w"> </span><span class="n">matrix</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">GLint</span><span class="w"> </span><span class="n">location</span><span class="w"> </span><span class="o">=</span>
+<span class="w">        </span><span class="n">glGetUniformLocation</span><span class="p">(</span><span class="n">m_RendererID</span><span class="p">,</span><span class="w"> </span><span class="n">name</span><span class="p">.</span><span class="n">c_str</span><span class="p">());</span>
+
+<span class="w">    </span><span class="n">glUniformMatrix4fv</span><span class="p">(</span>
+<span class="w">        </span><span class="n">location</span><span class="p">,</span>
+<span class="w">        </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">        </span><span class="n">GL_FALSE</span><span class="p">,</span>
+<span class="w">        </span><span class="n">glm</span><span class="o">::</span><span class="n">value_ptr</span><span class="p">(</span><span class="n">matrix</span><span class="p">));</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>参数含义：</p>
+<ul>
+<li><code>location</code>：uniform 在 Shader Program 中的位置；</li>
+<li><code>1</code>：上传一个矩阵；</li>
+<li><code>GL_FALSE</code>：GLM 已经是列主序，不需要转置；</li>
+<li><code>glm::value_ptr()</code>：指向矩阵首元素的连续 float 内存。</li>
+</ul>
+<p>如果 location 返回 <code>-1</code>，说明名称不存在或未被 Shader 使用。当前实现直接上传；后续可以加入错误检查。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[uniform name] --&gt; B[glGetUniformLocation]
+    B --&gt; C{location}
+    C --&gt; D[glUniformMatrix4fv]
+    E[GLM mat4] --&gt; F[glm::value_ptr]
+    F --&gt; D
+    D --&gt; G[Shader uniform updated]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_20_05.png" alt="UploadUniformMat4 查询位置并上传 GLM 矩阵数据" loading="lazy">
+  <p class="video-caption">📷 UploadUniformMat4 查询位置并上传 GLM 矩阵数据<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=1205" target="_blank" rel="noopener">回到原视频 (00:20:05)</a></p>
+</div>
+
+<h2 id="13">13. 第一次运行：画面保持不变</h2>
+<p><em>(参考时间: 00:22:31)</em></p>
+<p>第一次接入 camera VP 后，画面仍与上一讲一致。</p>
+<p>这说明：</p>
+<ul>
+<li>正交矩阵覆盖范围与原 NDC 坐标一致；</li>
+<li>Shader uniform 已成功上传；</li>
+<li>VP 矩阵的基础乘法和绑定顺序正确；</li>
+<li>之前只缺少相机数据的传递。</li>
+</ul>
+<p>编译时曾出现 Camera 类型未知错误，因为相机头文件被包含在了错误的文件位置。补到 Application 头文件后构建成功。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[Camera VP] --&gt; B[Shader uniform]
+    B --&gt; C[Same vertex positions]
+    C --&gt; D[Same rendered image]
+    D --&gt; E[Basic data path validated]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_22_31.png" alt="初次接入相机后，正交画面与上一讲保持一致" loading="lazy">
+  <p class="video-caption">📷 初次接入相机后，正交画面与上一讲保持一致<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=1351" target="_blank" rel="noopener">回到原视频 (00:22:31)</a></p>
+</div>
+
+<h2 id="14">14. 修改正交边界就是改变“视野”</h2>
+<p><em>(参考时间: 00:23:03)</em></p>
+<p>把投影边界从：</p>
+<div class="highlight"><pre><span></span><code>-1 .. +1
+</code></pre></div>
+
+<p>扩大为：</p>
+<div class="highlight"><pre><span></span><code>-2 .. +2
+</code></pre></div>
+
+<p>相机能看到更大的世界区域，相同物体在屏幕上就会变小。</p>
+<p>这相当于正交相机没有透视的“缩放”。改变边界与移动相机是不同操作：</p>
+<ul>
+<li>扩大 left/right/top/bottom：缩放视野；</li>
+<li>修改 camera position：平移观察位置。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Small Orthographic Bounds] --&gt; B[Object fills more screen]
+    C[Large Orthographic Bounds] --&gt; D[Object appears smaller]
+    E[Camera Position Change] --&gt; F[Objects shift on screen]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_23_03.png" alt="扩大正交边界后，相同场景在屏幕上变小" loading="lazy">
+  <p class="video-caption">📷 扩大正交边界后，相同场景在屏幕上变小<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=1383" target="_blank" rel="noopener">回到原视频 (00:23:03)</a></p>
+</div>
+
+<h2 id="15-aspect-ratio">15. Aspect Ratio 修复与方形变形</h2>
+<p><em>(参考时间: 00:25:08)</em></p>
+<p>方块顶点在 X/Y 上都是 <code>-0.75 .. 0.75</code>，但一开始显示为长方形。</p>
+<p>原因是投影边界使用相同的 X/Y 范围，而窗口是 1280×720。Camera 认为可见区域是正方形，Framebuffer 却把它拉伸到 16:9。</p>
+<p>修复边界：</p>
+<div class="highlight"><pre><span></span><code><span class="n">OrthographicCamera</span><span class="w"> </span><span class="nf">camera</span><span class="p">(</span>
+<span class="w">    </span><span class="mf">-1.6f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.6f</span><span class="p">,</span>
+<span class="w">    </span><span class="mf">-0.9f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.9f</span><span class="p">);</span>
+</code></pre></div>
+
+<p>此时：</p>
+<div class="highlight"><pre><span></span><code>3.2 / 1.8 = 16 / 9
+</code></pre></div>
+
+<p>方块恢复正方形，三角形也随之得到正确比例。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Square vertices] --&gt; B{Projection aspect}
+    B -- 1:1 on 16:9 viewport --&gt; C[Stretched rectangle]
+    B -- 16:9 in projection --&gt; D[Correct square]
+    D --&gt; E[Viewport and projection aligned]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_25_08.png" alt="正交投影的宽高比必须与窗口宽高比匹配" loading="lazy">
+  <p class="video-caption">📷 正交投影的宽高比必须与窗口宽高比匹配<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=1508" target="_blank" rel="noopener">回到原视频 (00:25:08)</a></p>
+</div>
+
+<h2 id="16-beginscene-camera">16. BeginScene 改为接收 Camera</h2>
+<p><em>(参考时间: 00:27:27)</em></p>
+<p>Renderer 接口：</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">BeginScene</span><span class="p">(</span><span class="n">OrthographicCamera</span><span class="o">&amp;</span><span class="w"> </span><span class="n">camera</span><span class="p">);</span>
+</code></pre></div>
+
+<p>实现：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">Renderer::BeginScene</span><span class="p">(</span><span class="n">OrthographicCamera</span><span class="o">&amp;</span><span class="w"> </span><span class="n">camera</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">m_SceneData</span><span class="o">-&gt;</span><span class="n">ViewProjectionMatrix</span><span class="w"> </span><span class="o">=</span>
+<span class="w">        </span><span class="n">camera</span><span class="p">.</span><span class="n">GetViewProjectionMatrix</span><span class="p">();</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这里没有复制整个 Camera。Camera 包含多个矩阵和成员，复制成本高；Renderer 真正需要的是 ViewProjection 快照。</p>
+<p>传引用避免复制整个对象，但只把矩阵复制进场景状态。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant App
+    participant Cam as OrthographicCamera
+    participant R as Renderer
+    App-&gt;&gt;R: BeginScene(camera&amp;)
+    R-&gt;&gt;Cam: GetViewProjectionMatrix()
+    Cam--&gt;&gt;R: const mat4&amp;
+    R-&gt;&gt;R: Copy VP into SceneData
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_27_27.png" alt="BeginScene 从相机读取并复制 VP 矩阵" loading="lazy">
+  <p class="video-caption">📷 BeginScene 从相机读取并复制 VP 矩阵<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=1647" target="_blank" rel="noopener">回到原视频 (00:27:27)</a></p>
+</div>
+
+<h2 id="17-scenedata-uniform">17. SceneData 保存当前场景 uniform</h2>
+<p><em>(参考时间: 00:29:16)</em></p>
+<p>Renderer 内部增加：</p>
+<div class="highlight"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">SceneData</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glm</span><span class="o">::</span><span class="n">mat4</span><span class="w"> </span><span class="n">ViewProjectionMatrix</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="k">static</span><span class="w"> </span><span class="n">SceneData</span><span class="o">*</span><span class="w"> </span><span class="n">m_SceneData</span><span class="p">;</span>
+</code></pre></div>
+
+<p>当前在 <code>Renderer.cpp</code> 中分配：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Renderer</span><span class="o">::</span><span class="n">SceneData</span><span class="o">*</span><span class="w"> </span><span class="n">Renderer</span><span class="o">::</span><span class="n">m_SceneData</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="k">new</span><span class="w"> </span><span class="n">Renderer</span><span class="o">::</span><span class="n">SceneData</span><span class="p">;</span>
+</code></pre></div>
+
+<p>这是临时实现：</p>
+<ul>
+<li>Renderer 是静态类；</li>
+<li>需要一个地方保存当前场景状态；</li>
+<li>SceneData 随引擎整个生命周期存在；</li>
+<li>未来会重构为更正式的 Renderer Context / Scene Renderer。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Renderer] --&gt; B[static SceneData*]
+    B --&gt; C[ViewProjectionMatrix]
+    D[BeginScene] --&gt; C
+    C --&gt; E[Submit uniforms]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_29_16.png" alt="SceneData 暂时保存当前场景的 ViewProjection" loading="lazy">
+  <p class="video-caption">📷 SceneData 暂时保存当前场景的 ViewProjection<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=1756" target="_blank" rel="noopener">回到原视频 (00:29:16)</a></p>
+</div>
+
+<h2 id="18-submit-shader-uniform">18. Submit 接收 Shader 并上传场景 uniform</h2>
+<p><em>(参考时间: 00:31:17)</em></p>
+<p>Renderer 提交接口改为：</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">Submit</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">Shader</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">shader</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexArray</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">vertexArray</span><span class="p">);</span>
+</code></pre></div>
+
+<p>实现：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">Renderer::Submit</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">Shader</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">shader</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexArray</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">vertexArray</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">shader</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="w">    </span><span class="n">shader</span><span class="o">-&gt;</span><span class="n">UploadUniformMat4</span><span class="p">(</span>
+<span class="w">        </span><span class="s">"u_ViewProjection"</span><span class="p">,</span>
+<span class="w">        </span><span class="n">m_SceneData</span><span class="o">-&gt;</span><span class="n">ViewProjectionMatrix</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">vertexArray</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="w">    </span><span class="n">RenderCommand</span><span class="o">::</span><span class="n">DrawIndexed</span><span class="p">(</span><span class="n">vertexArray</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Shader 放在参数前面，因为 Shader 决定“怎样渲染”，几何决定“渲染什么”。未来 Mesh/Material 会进一步封装这两类信息。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant App
+    participant R as Renderer
+    participant S as Shader
+    participant VA as VertexArray
+    App-&gt;&gt;R: Submit(shader, vertexArray)
+    R-&gt;&gt;S: Bind
+    R-&gt;&gt;S: Upload u_ViewProjection
+    R-&gt;&gt;VA: Bind
+    R-&gt;&gt;R: DrawIndexed
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_31_17.png" alt="Submit 绑定 Shader、上传场景 VP、绑定 VAO 并绘制" loading="lazy">
+  <p class="video-caption">📷 Submit 绑定 Shader、上传场景 VP、绑定 VAO 并绘制<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=1877" target="_blank" rel="noopener">回到原视频 (00:31:17)</a></p>
+</div>
+
+<h2 id="19-application">19. Application 的最终渲染流程</h2>
+<p><em>(参考时间: 00:31:42)</em></p>
+<p>Run 循环现在非常简洁：</p>
+<div class="highlight"><pre><span></span><code><span class="n">RenderCommand</span><span class="o">::</span><span class="n">SetClearColor</span><span class="p">({</span><span class="w"> </span><span class="mf">0.1f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1f</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">});</span>
+<span class="n">RenderCommand</span><span class="o">::</span><span class="n">Clear</span><span class="p">();</span>
+
+<span class="n">Renderer</span><span class="o">::</span><span class="n">BeginScene</span><span class="p">(</span><span class="n">m_Camera</span><span class="p">);</span>
+
+<span class="n">Renderer</span><span class="o">::</span><span class="n">Submit</span><span class="p">(</span><span class="n">m_BlueShader</span><span class="p">,</span><span class="w"> </span><span class="n">m_SquareVA</span><span class="p">);</span>
+<span class="n">Renderer</span><span class="o">::</span><span class="n">Submit</span><span class="p">(</span><span class="n">m_Shader</span><span class="p">,</span><span class="w"> </span><span class="n">m_VertexArray</span><span class="p">);</span>
+
+<span class="n">Renderer</span><span class="o">::</span><span class="n">EndScene</span><span class="p">();</span>
+</code></pre></div>
+
+<p>旧代码中的手动 Shader 绑定与 uniform 上传全部移除。对象绘制统一通过 Renderer 流程。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Clear] --&gt; B[BeginScene camera]
+    B --&gt; C[Submit blue shader + square VA]
+    C --&gt; D[Submit gradient shader + triangle VA]
+    D --&gt; E[EndScene]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_31_42.png" alt="Application 只负责清屏、BeginScene、两次 Submit 和 EndScene" loading="lazy">
+  <p class="video-caption">📷 Application 只负责清屏、BeginScene、两次 Submit 和 EndScene<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=1902" target="_blank" rel="noopener">回到原视频 (00:31:42)</a></p>
+</div>
+
+<h2 id="20-view">20. 平移测试验证 View 逆矩阵</h2>
+<p><em>(参考时间: 00:32:31)</em></p>
+<p>把相机位置设为：</p>
+<div class="highlight"><pre><span></span><code><span class="n">m_Camera</span><span class="p">.</span><span class="n">SetPosition</span><span class="p">({</span><span class="w"> </span><span class="mf">0.5f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.5f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span><span class="w"> </span><span class="p">});</span>
+</code></pre></div>
+
+<p>相机向右上移动，场景在屏幕上向左下移动。</p>
+<p>方向反转说明：</p>
+<ul>
+<li>Position 已写入相机变换；</li>
+<li>View 矩阵确实取了逆；</li>
+<li>ViewProjection 已重新计算；</li>
+<li>Shader 读取了新值。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[Camera +0.5 X/Y] --&gt; B[View inverse]
+    B --&gt; C[Scene -0.5 X/Y]
+    C --&gt; D[Objects move down-left]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_32_31.png" alt="相机向右上移动时，场景向左下移动" loading="lazy">
+  <p class="video-caption">📷 相机向右上移动时，场景向左下移动<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=1951" target="_blank" rel="noopener">回到原视频 (00:32:31)</a></p>
+</div>
+
+<h2 id="21-glm">21. 旋转测试失败：GLM 向量未初始化</h2>
+<p><em>(参考时间: 00:33:19)</em></p>
+<p>设置：</p>
+<div class="highlight"><pre><span></span><code><span class="n">m_Camera</span><span class="p">.</span><span class="n">SetRotation</span><span class="p">(</span><span class="mf">45.0f</span><span class="p">);</span>
+</code></pre></div>
+
+<p>画面却完全空白。第一反应是旋转单位错误，于是加入 <code>glm::radians()</code>，但问题仍然存在。</p>
+<p>进一步在调试器检查 <code>RecalculateViewMatrix()</code>：</p>
+<ul>
+<li>rotation 是 0.5；</li>
+<li>position 不是 <code>(0, 0, 0)</code>；</li>
+<li>GLM 向量在当前构造方式下没有被置零；</li>
+<li>未初始化的 position 产生无效相机变换，场景被移出可视范围。</li>
+</ul>
+<p>修复：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glm</span><span class="o">::</span><span class="n">vec3</span><span class="w"> </span><span class="n">m_Position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span><span class="w"> </span><span class="p">};</span>
+</code></pre></div>
+
+<p>重新运行后，旋转 45° 正常工作。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Rotation makes screen blank] --&gt; B{Radians correct?}
+    B -- Yes, still blank --&gt; C{Inspect matrix inputs}
+    C --&gt; D[Position contains garbage]
+    D --&gt; E[Initialize vec3 to zero]
+    E --&gt; F[Rotation works]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_34_51.png" alt="旋转画面消失的根因是 Camera 位置向量未初始化" loading="lazy">
+  <p class="video-caption">📷 旋转画面消失的根因是 Camera 位置向量未初始化<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=2091" target="_blank" rel="noopener">回到原视频 (00:34:51)</a></p>
+</div>
+
+<h2 id="22">22. 旋转与平移组合</h2>
+<p><em>(参考时间: 00:35:43)</em></p>
+<p>修复后同时设置：</p>
+<div class="highlight"><pre><span></span><code><span class="n">m_Camera</span><span class="p">.</span><span class="n">SetPosition</span><span class="p">({</span><span class="w"> </span><span class="mf">0.5f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.5f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span><span class="w"> </span><span class="p">});</span>
+<span class="n">m_Camera</span><span class="p">.</span><span class="n">SetRotation</span><span class="p">(</span><span class="mf">45.0f</span><span class="p">);</span>
+</code></pre></div>
+
+<p>两个对象同时旋转并偏移，方向与预期一致。</p>
+<p>这验证了：</p>
+<ul>
+<li><code>T * R</code> 的转换顺序；</li>
+<li><code>glm::radians()</code> 的旋转单位；</li>
+<li>View 逆矩阵；</li>
+<li>位置和旋转变化后的 VP 重算；</li>
+<li>Shader 每帧接收新 VP。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[Camera Position] --&gt; C[T * R]
+    B[Camera Rotation] --&gt; C
+    C --&gt; D[Inverse = View]
+    D --&gt; E[Projection * View]
+    E --&gt; F[Objects rotate and shift]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_35_43.png" alt="相机平移与 45 度旋转同时生效" loading="lazy">
+  <p class="video-caption">📷 相机平移与 45 度旋转同时生效<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=2143" target="_blank" rel="noopener">回到原视频 (00:35:43)</a></p>
+</div>
+
+<h2 id="23">23. 当前限制与下一步</h2>
+<p><em>(参考时间: 00:36:08)</em></p>
+<p>当前 Renderer Submit 每次都：</p>
+<ol>
+<li>绑定 Shader；</li>
+<li>上传 ViewProjection；</li>
+<li>绑定 VAO；</li>
+<li>发出 Draw Call。</li>
+</ol>
+<p>如果连续绘制很多使用同一 Shader 的对象，会重复上传相同的 VP。未来应：</p>
+<ul>
+<li>收集所有提交项；</li>
+<li>按 Shader / Material 分组；</li>
+<li>每个 Shader 只上传一次场景 uniforms；</li>
+<li>对相同材质对象合批；</li>
+<li>再为每个对象上传 Model 矩阵。</li>
+</ul>
+<p>下一步还可能处理：</p>
+<ul>
+<li>Shader uniform 系统；</li>
+<li>Model / Transform 矩阵；</li>
+<li>相机控制器；</li>
+<li>更正式的 Scene Renderer；</li>
+<li>把演示代码从 Application 移到 Sandbox。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Current immediate Submit] --&gt; B[Shader bind]
+    B --&gt; C[VP upload]
+    C --&gt; D[Draw]
+    E[Future batching] --&gt; F[Group by shader]
+    F --&gt; G[Upload VP once]
+    G --&gt; H[Upload model/material per object]
+    H --&gt; I[Draw batch]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_36_08.png" alt="当前立即提交可用，未来需要按 Shader/Material 合批" loading="lazy">
+  <p class="video-caption">📷 当前立即提交可用，未来需要按 Shader/Material 合批<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35&t=2168" target="_blank" rel="noopener">回到原视频 (00:36:08)</a></p>
+</div>
+
+<h2 id="24">24. 本节结论</h2>
+<p>本讲完成 Hazel 的第一个正交相机实现：</p>
+<ul>
+<li>建立 <code>OrthographicCamera</code> 类；</li>
+<li>用 <code>glm::ortho()</code> 创建 Projection；</li>
+<li>缓存 View 与 ViewProjection；</li>
+<li>用 Position 与 Z 轴 Rotation 生成相机变换；</li>
+<li>对相机变换取逆得到 View；</li>
+<li>将 Camera 加入 <code>Renderer::BeginScene()</code>；</li>
+<li>用 Renderer SceneData 保存 VP；</li>
+<li>为 Shader 增加 <code>UploadUniformMat4()</code>；</li>
+<li>通过 <code>glGetUniformLocation()</code> 与 <code>glUniformMatrix4fv()</code> 上传矩阵；</li>
+<li>在 Vertex Shader 中用 <code>u_ViewProjection</code> 变换顶点；</li>
+<li>修正 16:9 窗口下的投影宽高比；</li>
+<li>验证相机平移使场景反向移动；</li>
+<li>定位并修复未初始化的 GLM Position；</li>
+<li>验证平移与旋转组合；</li>
+<li>让 Application 渲染流程保持简洁。</li>
+</ul>
+<p>这一讲不仅接上了上一讲规划的数据流，也展示了矩阵代码最常见的两类调试问题：比例不一致与成员未初始化。最终画面正常，并不代表矩阵一直正确；通过平移、旋转和极端参数逐项验证，才能确认相机变换链完整可靠。</p>
+<h2 id="_2">附：参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=35">Bilibili 精译视频：035 - 创建正交相机</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/tree/c1d915e">本期对应代码提交 <code>c1d915e</code></a></li>
+<li><a href="https://glm.g-truc.net/0.9.9/api/a00243.html">GLM Manual：Matrix Transform</a></li>
+<li><a href="https://www.khronos.org/opengl/wiki/Uniform">OpenGL Wiki：Uniform</a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>
