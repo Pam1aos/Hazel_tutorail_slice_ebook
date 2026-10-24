@@ -72,6 +72,10 @@
   - [Markdown 版本](<Hazel Game Engine/030 - Renderer API Abstraction/book.md>)
   - 视频来源：[Bilibili 精译版第 30 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=30)
   - 主题：编译期与运行期渲染后端、`RendererAPI`、`VertexBuffer`/`IndexBuffer` 接口、OpenGL 实现和工厂分派
+- [031 - 顶点缓冲区布局](<Hazel Game Engine/031 - Vertex Buffer Layouts/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/031 - Vertex Buffer Layouts/book.md>)
+  - 视频来源：[Bilibili 精译版第 31 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=31)
+  - 主题：`ShaderDataType`、`BufferElement`、`BufferLayout`、自动偏移与步长、交错顶点属性和顶点颜色插值
 
 ## 南京大学操作系统原理 2026
 

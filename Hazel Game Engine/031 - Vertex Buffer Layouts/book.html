@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 031：顶点缓冲区布局</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: #f3f4f6; font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+            code { overflow-wrap: anywhere; word-break: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-031">Hazel 游戏引擎笔记 031：顶点缓冲区布局</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31">The Cherno 游戏引擎系列第 31 讲“顶点缓冲区布局”</a>，时长约 49 分 16 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。代码参考提交：<a href="https://github.com/TheCherno/Hazel/tree/e8eef16"><code>e8eef16</code></a>。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材；术语和代码以原视频及同期 Hazel 仓库为准。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>上一讲已经把 Vertex Buffer 和 Index Buffer 从 <code>Application</code> 中抽到通用接口与 OpenGL 实现后面。但顶点属性仍然由一组写死的数字描述：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glVertexAttribPointer</span><span class="p">(</span>
+<span class="w">    </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="n">GL_FLOAT</span><span class="p">,</span><span class="w"> </span><span class="n">GL_FALSE</span><span class="p">,</span>
+<span class="w">    </span><span class="mi">3</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="kt">float</span><span class="p">),</span>
+<span class="w">    </span><span class="nb">nullptr</span><span class="p">);</span>
+</code></pre></div>
+
+<p>这段代码同时隐藏了四项信息：</p>
+<ul>
+<li>Shader 中的属性位置；</li>
+<li>每个属性包含几个基础分量；</li>
+<li>一条完整顶点记录占多少字节；</li>
+<li>属性在一条顶点记录中的起始偏移。</li>
+</ul>
+<p>本讲的目标，是把这些数字改写成可读、可复用、可跨渲染 API 表达的布局描述。最终希望上层代码写成：</p>
+<div class="highlight"><pre><span></span><code><span class="n">BufferLayout</span><span class="w"> </span><span class="n">layout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="n">ShaderDataType</span><span class="o">::</span><span class="n">Float3</span><span class="p">,</span><span class="w"> </span><span class="s">"a_Position"</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="n">ShaderDataType</span><span class="o">::</span><span class="n">Float4</span><span class="p">,</span><span class="w"> </span><span class="s">"a_Color"</span><span class="w"> </span><span class="p">}</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>本讲完成的内容：</p>
+<ul>
+<li>解释顶点属性、顶点缓冲区和顶点数组之间的关系；</li>
+<li>建立跨 API 的 <code>ShaderDataType</code>；</li>
+<li>建立 <code>BufferElement</code>，描述单个顶点属性；</li>
+<li>建立 <code>BufferLayout</code>，自动计算偏移和步长；</li>
+<li>为 <code>VertexBuffer</code> 增加 <code>SetLayout()</code> 与 <code>GetLayout()</code>；</li>
+<li>使用初始化列表写出接近 Shader 声明形态的布局；</li>
+<li>按布局自动调用 <code>glVertexAttribPointer()</code>；</li>
+<li>为三角形加入颜色数据并验证颜色插值；</li>
+<li>定位一次由 Shader 未输出颜色导致的“黑三角形”问题；</li>
+<li>保留 Vertex Array 与 Draw Call 的 OpenGL 代码，作为下一讲的技术债。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Application 顶点数据] --&gt; B[VertexBuffer]
+    B --&gt; C[BufferLayout]
+    C --&gt; D[BufferElement a_Position]
+    C --&gt; E[BufferElement a_Color]
+    D --&gt; F[自动计算 Offset / Size]
+    E --&gt; F
+    F --&gt; G[Stride]
+    G --&gt; H[glVertexAttribPointer]
+    H --&gt; I[Shader 属性输入]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_06_39.png" alt="重构前 Application 中写死的顶点属性配置" loading="lazy">
+  <p class="video-caption">📷 重构前 Application 中写死的顶点属性配置<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=399" target="_blank" rel="noopener">回到原视频 (00:06:39)</a></p>
+</div>
+
+<h2 id="1">1. 顶点缓冲区本身只是字节块</h2>
+<p><em>(参考时间: 00:05:32)</em></p>
+<p>CPU 上传给 GPU 的 Vertex Buffer 本质上是一段连续内存。OpenGL 知道这段内存的起始地址和字节数，却不知道其中的业务含义。</p>
+<p>同样一段 <code>float</code> 数组，可以被解释成：</p>
+<ul>
+<li>一个三浮点位置；</li>
+<li>一个位置加一个四浮点颜色；</li>
+<li>位置、法线、纹理坐标和切线；</li>
+<li>多顶点交错存放的完整记录；</li>
+<li>多个独立缓冲区分别提供不同属性。</li>
+</ul>
+<p>要让 GPU 正确读取，必须告诉它：</p>
+<ul>
+<li>从哪个字节开始；</li>
+<li>每隔多少字节跳到下一个顶点；</li>
+<li>一个属性由几个基础类型组成；</li>
+<li>基础类型是 <code>float</code>、<code>int</code> 还是其他格式；</li>
+<li>是否需要把整数归一化成浮点数。</li>
+</ul>
+<p>这就是顶点缓冲区布局需要表达的内容。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[连续字节块] --&gt; B{布局解释}
+    B --&gt; C[位置 Float3]
+    B --&gt; D[颜色 Float4]
+    B --&gt; E[法线 Float3]
+    B --&gt; F[纹理坐标 Float2]
+</code></pre></div>
+
+<h2 id="2">2. 属性状态实际存放在哪里</h2>
+<p><em>(参考时间: 00:07:53)</em></p>
+<p><code>glVertexAttribPointer()</code> 描述的是 Vertex Buffer 中的数据，但 OpenGL 会把这份属性配置保存在当前绑定的 Vertex Array Object 中。</p>
+<p>因此必须区分两层关系：</p>
+<ul>
+<li><strong>Vertex Buffer</strong> 保存顶点原始数据；</li>
+<li><strong>Vertex Array</strong> 保存如何读取这些数据的属性状态。</li>
+</ul>
+<p>一个 Vertex Array 可以关联多个 Vertex Buffer，也可以让多个属性共享同一个交错缓冲区。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Vertex Array Object] --&gt; B[Attribute 0: a_Position]
+    A --&gt; C[Attribute 1: a_Color]
+    B --&gt; D[Interleaved Vertex Buffer]
+    C --&gt; D
+    A --&gt; E[可选的其他 Vertex Buffer]
+</code></pre></div>
+
+<p>当前相机三角形采用交错布局：每个顶点记录先放 3 个位置浮点，再放 4 个颜色浮点。全部记录连续排列，读取属性时依靠 <code>stride</code> 跳过一整条顶点记录。</p>
+<p>另一种方案是为位置、颜色、法线分别创建 Vertex Buffer。OpenGL 不强制选择某一种方案，但绝大多数场景会把常用属性交错在同一个缓冲区中，以提高顶点数据的局部性。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_09_37.png" alt="交错顶点数据与独立顶点缓冲区的选择" loading="lazy">
+  <p class="video-caption">📷 交错顶点数据与独立顶点缓冲区的选择<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=577" target="_blank" rel="noopener">回到原视频 (00:09:37)</a></p>
+</div>
+
+<h2 id="3-shader">3. 现有属性配置与 Shader 的对应关系</h2>
+<p><em>(参考时间: 00:10:07)</em></p>
+<p>Shader 中的属性声明已经给出了布局的高层语义：</p>
+<div class="highlight"><pre><span></span><code><span class="k">layout</span><span class="p">(</span><span class="n">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mo">0</span><span class="p">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="kt">vec3</span><span class="w"> </span><span class="n">a_Position</span><span class="p">;</span>
+<span class="k">layout</span><span class="p">(</span><span class="n">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="kt">vec4</span><span class="w"> </span><span class="n">a_Color</span><span class="p">;</span>
+</code></pre></div>
+
+<p>对应到 OpenGL：</p>
+<table>
+<thead>
+<tr>
+<th>Shader 声明</th>
+<th style="text-align: right;">位置</th>
+<th>基础类型</th>
+<th style="text-align: right;">分量数</th>
+<th style="text-align: right;">字节偏移</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vec3 a_Position</code></td>
+<td style="text-align: right;">0</td>
+<td><code>GL_FLOAT</code></td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td><code>vec4 a_Color</code></td>
+<td style="text-align: right;">1</td>
+<td><code>GL_FLOAT</code></td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">12</td>
+</tr>
+</tbody>
+</table>
+<p>每个顶点共有 7 个浮点，所以步长为：</p>
+<div class="highlight"><pre><span></span><code>7 * sizeof(float) = 28 bytes
+</code></pre></div>
+
+<p>如果把位置与颜色拆成两个缓冲区，每个缓冲区的 stride 和 offset 会不同。布局对象应该描述“内存怎样排列”，而不应该假定数据放在同一个 VBO 中。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant L as BufferLayout
+    participant V as VertexBuffer
+    participant VAO as Vertex Array
+    participant S as Shader
+    L-&gt;&gt;V: Float3 a_Position
+    L-&gt;&gt;V: Float4 a_Color
+    V-&gt;&gt;VAO: 配置 location 0 / 1
+    VAO-&gt;&gt;S: 在 Draw Call 时提供属性
+</code></pre></div>
+
+<p>OpenGL 不会在设置 <code>glVertexAttribPointer()</code> 时自动验证布局是否与 Shader 一致。DirectX 等 API 的验证更严格，但抽象层仍然需要显式描述数据。OpenGL 的宽松只意味着错误可能在画面上才暴露，并不意味着布局信息可以被省略。</p>
+<h2 id="4-shader">4. 目标：让布局看起来就像 Shader</h2>
+<p><em>(参考时间: 00:13:23)</em></p>
+<p>讲师追求的不只是“能运行”，而是客户端代码一眼就能看懂。理想的布局应当直接对应 Shader 声明中的数据：</p>
+<div class="highlight"><pre><span></span><code><span class="n">BufferLayout</span><span class="w"> </span><span class="n">layout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="n">ShaderDataType</span><span class="o">::</span><span class="n">Float3</span><span class="p">,</span><span class="w"> </span><span class="s">"a_Position"</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="n">ShaderDataType</span><span class="o">::</span><span class="n">Float4</span><span class="p">,</span><span class="w"> </span><span class="s">"a_Color"</span><span class="w"> </span><span class="p">}</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>这个设计同时满足三个目标：</p>
+<ol>
+<li><strong>可读</strong>：类型和名字与 Shader 接近；</li>
+<li><strong>可扩展</strong>：可以继续加入纹理坐标、法线、颜色和切线；</li>
+<li><strong>跨 API</strong>：OpenGL、DirectX、Vulkan、Metal 都消费同一份描述。</li>
+</ol>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[描述性布局] --&gt; B[上层代码易读]
+    A --&gt; C[自动 Offset / Stride]
+    A --&gt; D[后端转换基础类型]
+    B --&gt; E[减少手工数字错误]
+    C --&gt; E
+    D --&gt; F[保留跨 API 能力]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_14_03.png" alt="目标中的 BufferLayout 初始化列表写法" loading="lazy">
+  <p class="video-caption">📷 目标中的 BufferLayout 初始化列表写法<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=843" target="_blank" rel="noopener">回到原视频 (00:14:03)</a></p>
+</div>
+
+<h2 id="5-shaderdatatype-api">5. ShaderDataType：跨 API 的数据类型</h2>
+<p><em>(参考时间: 00:14:37)</em></p>
+<p>不能直接把 GLSL 的 <code>vec3</code> 或 GLM 的数学类型当作通用布局类型。<code>vec3</code> 与具体 Shader 语言绑定，数学库类型又会把渲染接口和数学库耦合在一起。</p>
+<p>因此引入独立的 <code>ShaderDataType</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="k">enum</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">ShaderDataType</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">None</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="n">Float</span><span class="p">,</span><span class="w"> </span><span class="n">Float2</span><span class="p">,</span><span class="w"> </span><span class="n">Float3</span><span class="p">,</span><span class="w"> </span><span class="n">Float4</span><span class="p">,</span>
+<span class="w">    </span><span class="n">Mat3</span><span class="p">,</span><span class="w"> </span><span class="n">Mat4</span><span class="p">,</span>
+<span class="w">    </span><span class="n">Int</span><span class="p">,</span><span class="w"> </span><span class="n">Int2</span><span class="p">,</span><span class="w"> </span><span class="n">Int3</span><span class="p">,</span><span class="w"> </span><span class="n">Int4</span><span class="p">,</span>
+<span class="w">    </span><span class="n">Bool</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>命名采用类似 HLSL 的 <code>Float3</code>，而不是 GLSL 的 <code>vec3</code>。这不是说当前 Shader 已经使用 HLSL，而是让布局层保持 API 中立，并为未来 HLSL 路径留出空间。</p>
+<div class="highlight"><pre><span></span><code>classDiagram
+    class ShaderDataType {
+        &lt;&lt;enum&gt;&gt;
+        None
+        Float
+        Float2
+        Float3
+        Float4
+        Mat3
+        Mat4
+        Int
+        Int2
+        Int3
+        Int4
+        Bool
+    }
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_20_44.png" alt="ShaderDataType 覆盖浮点、整数、矩阵与布尔类型" loading="lazy">
+  <p class="video-caption">📷 ShaderDataType 覆盖浮点、整数、矩阵与布尔类型<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=1244" target="_blank" rel="noopener">回到原视频 (00:20:44)</a></p>
+</div>
+
+<h2 id="6-shaderdatatype">6. 从 ShaderDataType 计算字节数</h2>
+<p><em>(参考时间: 00:21:02)</em></p>
+<p>每种类型都需要能回答“占用多少字节”。当前统一假设 <code>float</code> 和 <code>int</code> 为 4 字节：</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="nf">ShaderDataTypeSize</span><span class="p">(</span>
+<span class="w">    </span><span class="n">ShaderDataType</span><span class="w"> </span><span class="n">type</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">type</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Float</span><span class="p">:</span><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="mi">4</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Float2</span><span class="p">:</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Float3</span><span class="p">:</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">3</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Float4</span><span class="p">:</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Mat3</span><span class="p">:</span><span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">3</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">3</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Mat4</span><span class="p">:</span><span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Int</span><span class="p">:</span><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">4</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Int2</span><span class="p">:</span><span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Int3</span><span class="p">:</span><span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">3</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Int4</span><span class="p">:</span><span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Bool</span><span class="p">:</span><span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">HZ_CORE_ASSERT</span><span class="p">(</span><span class="nb">false</span><span class="p">,</span><span class="w"> </span><span class="s">"Unknown ShaderDataType!"</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><code>Float3</code> 的大小是 12 字节，<code>Float4</code> 是 16 字节。当前只计算紧凑排列大小，还没有处理不同后端的矩阵对齐规则。这个抽象层先把最常见的顶点属性描述统一起来。</p>
+<p><code>None</code> 没有单独分支。它不是合法的属性类型；如果误传到函数末尾，断言会暴露错误。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_21_30.png" alt="ShaderDataTypeSize 的 switch 分支与字节计算" loading="lazy">
+  <p class="video-caption">📷 ShaderDataTypeSize 的 switch 分支与字节计算<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=1290" target="_blank" rel="noopener">回到原视频 (00:21:30)</a></p>
+</div>
+
+<h2 id="7-bufferelement">7. BufferElement：描述一个顶点属性</h2>
+<p><em>(参考时间: 00:17:15)</em></p>
+<p>单个属性由 <code>BufferElement</code> 表示：</p>
+<div class="highlight"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">BufferElement</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">Name</span><span class="p">;</span>
+<span class="w">    </span><span class="n">ShaderDataType</span><span class="w"> </span><span class="n">Type</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">Size</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">Offset</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">Normalized</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">BufferElement</span><span class="p">()</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="w">    </span><span class="n">BufferElement</span><span class="p">(</span>
+<span class="w">        </span><span class="n">ShaderDataType</span><span class="w"> </span><span class="n">type</span><span class="p">,</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">name</span><span class="p">,</span>
+<span class="w">        </span><span class="kt">bool</span><span class="w"> </span><span class="n">normalized</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">)</span>
+<span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="n">Name</span><span class="p">(</span><span class="n">name</span><span class="p">),</span>
+<span class="w">          </span><span class="n">Type</span><span class="p">(</span><span class="n">type</span><span class="p">),</span>
+<span class="w">          </span><span class="n">Size</span><span class="p">(</span><span class="n">ShaderDataTypeSize</span><span class="p">(</span><span class="n">type</span><span class="p">)),</span>
+<span class="w">          </span><span class="n">Offset</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+<span class="w">          </span><span class="n">Normalized</span><span class="p">(</span><span class="n">normalized</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>各字段的职责如下：</p>
+<ul>
+<li><code>Name</code>：与 Shader 属性名对应，便于阅读，也方便未来对接需要名称的 API；</li>
+<li><code>Type</code>：跨 API 的类型语义；</li>
+<li><code>Size</code>：该属性的字节数；</li>
+<li><code>Offset</code>：从一条顶点记录的起点到该属性的字节偏移；</li>
+<li><code>Normalized</code>：整数属性是否需要归一化。</li>
+</ul>
+<p><code>Size</code> 可以在构造时立即计算；<code>Offset</code> 不能，因为它取决于同一布局中排在前面的属性。</p>
+<p>默认构造函数不是装饰。<code>BufferElement</code> 和 <code>BufferLayout</code> 需要放进容器，缺少默认构造会在编译阶段报错。</p>
+<div class="highlight"><pre><span></span><code>classDiagram
+    class BufferElement {
+        +string Name
+        +ShaderDataType Type
+        +uint32_t Size
+        +uint32_t Offset
+        +bool Normalized
+        +GetComponentCount() uint32_t
+    }
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_17_15.png" alt="BufferElement 保存名称、类型、大小、偏移与归一化状态" loading="lazy">
+  <p class="video-caption">📷 BufferElement 保存名称、类型、大小、偏移与归一化状态<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=1035" target="_blank" rel="noopener">回到原视频 (00:17:15)</a></p>
+</div>
+
+<h2 id="8-component-count">8. Component Count 不是矩阵元素数</h2>
+<p><em>(参考时间: 00:32:24)</em></p>
+<p>OpenGL 的 <code>glVertexAttribPointer()</code> 不接受 <code>Float3</code> 这样的复合类型。它需要两项信息：</p>
+<ul>
+<li>基础类型，例如 <code>GL_FLOAT</code>；</li>
+<li>该属性包含几个基础分量，例如 3。</li>
+</ul>
+<p>因此 <code>BufferElement</code> 还需要返回 component count：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">uint32_t</span><span class="w"> </span><span class="nf">GetComponentCount</span><span class="p">()</span><span class="w"> </span><span class="k">const</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">Type</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Float</span><span class="p">:</span><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Float2</span><span class="p">:</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Float3</span><span class="p">:</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">3</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Float4</span><span class="p">:</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">4</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Mat3</span><span class="p">:</span><span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="mi">3</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">3</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Mat4</span><span class="p">:</span><span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Int</span><span class="p">:</span><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Int2</span><span class="p">:</span><span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Int3</span><span class="p">:</span><span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="mi">3</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Int4</span><span class="p">:</span><span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="mi">4</span><span class="p">;</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Bool</span><span class="p">:</span><span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">HZ_CORE_ASSERT</span><span class="p">(</span><span class="nb">false</span><span class="p">,</span><span class="w"> </span><span class="s">"Unknown ShaderDataType!"</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这里不把 component count 缓存成成员，因为调用频率不高，额外保存只会增加布局对象的数据量。直接由类型转换更简单。</p>
+<p>矩阵类型返回 <code>3 * 3</code> 或 <code>4 * 4</code>，为未来上传 uniform 或扩展属性描述保留完整分量信息。当前顶点属性仍主要使用 <code>Float3</code> 和 <code>Float4</code>。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_34_19.png" alt="GetComponentCount 负责把跨 API 类型转换成 OpenGL 所需分量数" loading="lazy">
+  <p class="video-caption">📷 GetComponentCount 负责把跨 API 类型转换成 OpenGL 所需分量数<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=2059" target="_blank" rel="noopener">回到原视频 (00:34:19)</a></p>
+</div>
+
+<h2 id="9-bufferlayout">9. BufferLayout：从初始化列表得到元素数组</h2>
+<p><em>(参考时间: 00:23:48)</em></p>
+<p><code>BufferLayout</code> 内部保存 <code>BufferElement</code> 数组：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BufferLayout</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">BufferLayout</span><span class="p">()</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="w">    </span><span class="n">BufferLayout</span><span class="p">(</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">initializer_list</span><span class="o">&lt;</span><span class="n">BufferElement</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">elements</span><span class="p">)</span>
+<span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="n">m_Elements</span><span class="p">(</span><span class="n">elements</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">CalculateOffsetsAndStride</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">GetStride</span><span class="p">()</span><span class="w"> </span><span class="k">const</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">m_Stride</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">BufferElement</span><span class="o">&gt;&amp;</span>
+<span class="w">    </span><span class="n">GetElements</span><span class="p">()</span><span class="w"> </span><span class="k">const</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">m_Elements</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">BufferElement</span><span class="o">&gt;</span><span class="w"> </span><span class="n">m_Elements</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">m_Stride</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>为什么构造函数不直接接收 <code>const std::vector&lt;BufferElement&gt;&amp;</code>？</p>
+<p>如果写成 <code>BufferLayout layout = { ... };</code>，从大括号列表到 <code>vector</code> 需要一次隐式转换，从 <code>vector</code> 到 <code>BufferLayout</code> 又需要一次隐式转换。C++ 不允许同一条初始化链里连续发生两次用户定义转换。</p>
+<p>直接接收 <code>std::initializer_list&lt;BufferElement&gt;</code> 后，大括号列表可以一步构造布局，再在成员初始化列表中复制成 <code>vector</code>。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[initializer_list] --&gt; B[BufferLayout]
+    A -. 两次隐式转换不允许 .-&gt; C[vector]
+    C -. 再构造 .-&gt; B
+    A --&gt; D[成员 vector]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_24_00.png" alt="BufferLayout 的初始化列表构造函数与元素容器" loading="lazy">
+  <p class="video-caption">📷 BufferLayout 的初始化列表构造函数与元素容器<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=1440" target="_blank" rel="noopener">回到原视频 (00:24:00)</a></p>
+</div>
+
+<h2 id="10-offset-stride">10. 自动计算 Offset 与 Stride</h2>
+<p><em>(参考时间: 00:26:07)</em></p>
+<p>有了完整元素列表后，就可以计算每条属性在顶点记录中的位置：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">CalculateOffsetsAndStride</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="n">m_Stride</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">element</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">m_Elements</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">element</span><span class="p">.</span><span class="n">Offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">offset</span><span class="p">;</span>
+<span class="w">        </span><span class="n">offset</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">element</span><span class="p">.</span><span class="n">Size</span><span class="p">;</span>
+<span class="w">        </span><span class="n">m_Stride</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">element</span><span class="p">.</span><span class="n">Size</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>算法是顺序累加：</p>
+<ol>
+<li>第一个元素从偏移 0 开始；</li>
+<li>当前元素大小加入累计偏移；</li>
+<li>该累计值成为下一个元素的起点；</li>
+<li>所有元素大小之和就是 stride。</li>
+</ol>
+<p>例如布局为 <code>Float3, Float4, Float3</code>：</p>
+<table>
+<thead>
+<tr>
+<th>元素</th>
+<th style="text-align: right;">Size</th>
+<th style="text-align: right;">Offset</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Float3</code></td>
+<td style="text-align: right;">12</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td><code>Float4</code></td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">12</td>
+</tr>
+<tr>
+<td><code>Float3</code></td>
+<td style="text-align: right;">12</td>
+<td style="text-align: right;">28</td>
+</tr>
+</tbody>
+</table>
+<p>总 stride 为 <code>12 + 16 + 12 = 40</code> 字节。讲师在调试器中分别验证了前两项和三项布局，确认 offset 与 stride 都随元素变化自动更新。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Offset = 0, Stride = 0] --&gt; B[元素 Float3]
+    B --&gt; C[Offset 0, 增加 12]
+    C --&gt; D[元素 Float4]
+    D --&gt; E[Offset 12, 增加 16]
+    E --&gt; F[元素 Float3]
+    F --&gt; G[Offset 28, 增加 12]
+    G --&gt; H[Stride 40]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_29_00.png" alt="调试器中的布局元素、偏移与总步长" loading="lazy">
+  <p class="video-caption">📷 调试器中的布局元素、偏移与总步长<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=1740" target="_blank" rel="noopener">回到原视频 (00:29:00)</a></p>
+</div>
+
+<h2 id="11-vertexbuffer">11. 把布局挂到 VertexBuffer 上</h2>
+<p><em>(参考时间: 00:29:25)</em></p>
+<p>布局描述的是 Vertex Buffer 的内存内容，因此通用接口增加：</p>
+<div class="highlight"><pre><span></span><code><span class="k">virtual</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">BufferLayout</span><span class="o">&amp;</span><span class="w"> </span><span class="nf">GetLayout</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">SetLayout</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">BufferLayout</span><span class="o">&amp;</span><span class="w"> </span><span class="n">layout</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+</code></pre></div>
+
+<p>OpenGL 实现保存一份布局副本：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">OpenGLVertexBuffer</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">VertexBuffer</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">BufferLayout</span><span class="o">&amp;</span><span class="w"> </span><span class="n">GetLayout</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">m_Layout</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">SetLayout</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">BufferLayout</span><span class="o">&amp;</span><span class="w"> </span><span class="n">layout</span><span class="p">)</span><span class="w"> </span><span class="k">override</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">m_Layout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">layout</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">m_RendererID</span><span class="p">;</span>
+<span class="w">    </span><span class="n">BufferLayout</span><span class="w"> </span><span class="n">m_Layout</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>这里保存副本，而不是依赖调用方临时对象继续存活。应用可以创建局部布局、调用 <code>SetLayout()</code>，随后离开作用域；Vertex Buffer 仍然拥有完整描述。</p>
+<p>OpenGL 实际上把属性状态存进 Vertex Array，但讲师把表面 API 放在 Vertex Buffer 上，因为布局从语义上描述的是缓冲区数据，而且 DirectX 也没有独立的 Vertex Array 对象。底层的 VAO 差异留到下一讲抽象。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant App
+    participant VB as VertexBuffer
+    participant GL as OpenGLVertexBuffer
+    App-&gt;&gt;VB: Create(vertices, size)
+    App-&gt;&gt;VB: SetLayout(layout)
+    VB-&gt;&gt;GL: 保存 m_Layout
+    App-&gt;&gt;VB: GetLayout()
+    VB--&gt;&gt;App: const BufferLayout&amp;
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_30_17.png" alt="OpenGLVertexBuffer 内部保存通用 BufferLayout" loading="lazy">
+  <p class="video-caption">📷 OpenGLVertexBuffer 内部保存通用 BufferLayout<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=1817" target="_blank" rel="noopener">回到原视频 (00:30:17)</a></p>
+</div>
+
+<h2 id="12">12. 为布局提供迭代能力</h2>
+<p><em>(参考时间: 00:31:14)</em></p>
+<p>如果只暴露 <code>GetElements()</code>，调用端只能写：</p>
+<div class="highlight"><pre><span></span><code><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">element</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">layout</span><span class="p">.</span><span class="n">GetElements</span><span class="p">())</span>
+</code></pre></div>
+
+<p>虽然可以运行，但讲师希望布局本身就能直接迭代：</p>
+<div class="highlight"><pre><span></span><code><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">element</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">layout</span><span class="p">)</span>
+</code></pre></div>
+
+<p>因此 <code>BufferLayout</code> 提供 <code>begin()</code> 与 <code>end()</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">BufferElement</span><span class="o">&gt;::</span><span class="n">iterator</span><span class="w"> </span><span class="n">begin</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">m_Elements</span><span class="p">.</span><span class="n">begin</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">BufferElement</span><span class="o">&gt;::</span><span class="n">iterator</span><span class="w"> </span><span class="n">end</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">m_Elements</span><span class="p">.</span><span class="n">end</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">BufferElement</span><span class="o">&gt;::</span><span class="n">const_iterator</span><span class="w"> </span><span class="n">begin</span><span class="p">()</span><span class="w"> </span><span class="k">const</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">m_Elements</span><span class="p">.</span><span class="n">begin</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">BufferElement</span><span class="o">&gt;::</span><span class="n">const_iterator</span><span class="w"> </span><span class="n">end</span><span class="p">()</span><span class="w"> </span><span class="k">const</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">m_Elements</span><span class="p">.</span><span class="n">end</span><span class="p">();</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>非 const 版本支持需要时修改元素；const 版本让 <code>GetLayout()</code> 返回的只读引用也能参与范围 for。</p>
+<p>最初只实现非 const 迭代器时，<code>const BufferLayout&amp;</code> 无法进入范围 for。补上 const iterator 后，布局可以被安全地读取，同时不能让调用者绕过封装修改内部容器。</p>
+<div class="highlight"><pre><span></span><code>classDiagram
+    class BufferLayout {
+        -vector~BufferElement~ m_Elements
+        -uint32_t m_Stride
+        +begin() iterator
+        +end() iterator
+        +begin() const_iterator
+        +end() const_iterator
+        +GetStride() uint32_t
+        +GetElements() vector
+    }
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_31_14.png" alt="通过 begin/end 让 BufferLayout 直接参与范围 for" loading="lazy">
+  <p class="video-caption">📷 通过 begin/end 让 BufferLayout 直接参与范围 for<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=1874" target="_blank" rel="noopener">回到原视频 (00:31:14)</a></p>
+</div>
+
+<h2 id="13-shader">13. 按布局自动配置 Shader 属性</h2>
+<p><em>(参考时间: 00:35:18)</em></p>
+<p>OpenGL 需要把 <code>ShaderDataType</code> 映射成基础 OpenGL 类型：</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="n">GLenum</span><span class="w"> </span><span class="nf">ShaderDataTypeToOpenGLBaseType</span><span class="p">(</span>
+<span class="w">    </span><span class="n">ShaderDataType</span><span class="w"> </span><span class="n">type</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">type</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Float</span><span class="p">:</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Float2</span><span class="p">:</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Float3</span><span class="p">:</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Float4</span><span class="p">:</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Mat3</span><span class="p">:</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Mat4</span><span class="p">:</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">GL_FLOAT</span><span class="p">;</span>
+
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Int</span><span class="p">:</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Int2</span><span class="p">:</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Int3</span><span class="p">:</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Int4</span><span class="p">:</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">GL_INT</span><span class="p">;</span>
+
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">ShaderDataType</span><span class="o">::</span><span class="no">Bool</span><span class="p">:</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">GL_BOOL</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">HZ_CORE_ASSERT</span><span class="p">(</span><span class="nb">false</span><span class="p">,</span><span class="w"> </span><span class="s">"Unknown ShaderDataType!"</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这个函数暂时放在 <code>Application.cpp</code>，因为它只是让当前演示跑起来的 OpenGL 转换层。下一阶段应把它移进 OpenGL 平台实现，避免上层代码接触 <code>GLenum</code>、<code>GL_FLOAT</code> 等平台专用名称。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[ShaderDataType] --&gt; B{基础类型}
+    B -- Float / Float2 / Float3 / Float4 / Mat3 / Mat4 --&gt; C[GL_FLOAT]
+    B -- Int / Int2 / Int3 / Int4 --&gt; D[GL_INT]
+    B -- Bool --&gt; E[GL_BOOL]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_36_00.png" alt="ShaderDataType 到 OpenGL 基础类型的转换函数" loading="lazy">
+  <p class="video-caption">📷 ShaderDataType 到 OpenGL 基础类型的转换函数<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=2160" target="_blank" rel="noopener">回到原视频 (00:36:00)</a></p>
+</div>
+
+<h2 id="14">14. 用循环设置每个顶点属性</h2>
+<p><em>(参考时间: 00:37:42)</em></p>
+<p>有了布局后，原先手写的两次 <code>glVertexAttribPointer()</code> 可以改为统一循环：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">uint32_t</span><span class="w"> </span><span class="n">index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">layout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">m_VertexBuffer</span><span class="o">-&gt;</span><span class="n">GetLayout</span><span class="p">();</span>
+
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">element</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">layout</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glEnableVertexAttribArray</span><span class="p">(</span><span class="n">index</span><span class="p">);</span>
+<span class="w">    </span><span class="n">glVertexAttribPointer</span><span class="p">(</span>
+<span class="w">        </span><span class="n">index</span><span class="p">,</span>
+<span class="w">        </span><span class="n">element</span><span class="p">.</span><span class="n">GetComponentCount</span><span class="p">(),</span>
+<span class="w">        </span><span class="n">ShaderDataTypeToOpenGLBaseType</span><span class="p">(</span><span class="n">element</span><span class="p">.</span><span class="n">Type</span><span class="p">),</span>
+<span class="w">        </span><span class="n">element</span><span class="p">.</span><span class="n">Normalized</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">GL_TRUE</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">GL_FALSE</span><span class="p">,</span>
+<span class="w">        </span><span class="n">layout</span><span class="p">.</span><span class="n">GetStride</span><span class="p">(),</span>
+<span class="w">        </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="p">)</span><span class="n">element</span><span class="p">.</span><span class="n">Offset</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">index</span><span class="o">++</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>每个参数现在都有明确来源：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>来源</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>location</td>
+<td>当前循环索引</td>
+</tr>
+<tr>
+<td>component count</td>
+<td><code>element.GetComponentCount()</code></td>
+</tr>
+<tr>
+<td>base type</td>
+<td><code>ShaderDataTypeToOpenGLBaseType(element.Type)</code></td>
+</tr>
+<tr>
+<td>normalized</td>
+<td><code>element.Normalized</code></td>
+</tr>
+<tr>
+<td>stride</td>
+<td><code>layout.GetStride()</code></td>
+</tr>
+<tr>
+<td>byte offset</td>
+<td><code>element.Offset</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>glVertexAttribPointer()</code> 的最后一个参数类型是 <code>const void*</code>，这里却需要传字节偏移。因此先把整数 <code>Offset</code> 转成指针形式。OpenGL 不会解引用这个地址，只把它当作相对于缓冲区起点的偏移。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant App
+    participant Layout
+    participant Element
+    participant GL as OpenGL
+    loop 每个 BufferElement
+        App-&gt;&gt;Layout: GetStride()
+        App-&gt;&gt;Element: GetComponentCount()
+        App-&gt;&gt;Element: Type / Normalized / Offset
+        App-&gt;&gt;GL: glEnableVertexAttribArray(index)
+        App-&gt;&gt;GL: glVertexAttribPointer(...)
+    end
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_38_10.png" alt="布局中的每个元素被转换为一次 glVertexAttribPointer 调用" loading="lazy">
+  <p class="video-caption">📷 布局中的每个元素被转换为一次 glVertexAttribPointer 调用<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=2290" target="_blank" rel="noopener">回到原视频 (00:38:10)</a></p>
+</div>
+
+<h2 id="15">15. 用位置数据验证原有三角形</h2>
+<p><em>(参考时间: 00:40:25)</em></p>
+<p>第一步只使用位置属性：</p>
+<div class="highlight"><pre><span></span><code><span class="n">BufferLayout</span><span class="w"> </span><span class="n">layout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="n">ShaderDataType</span><span class="o">::</span><span class="n">Float3</span><span class="p">,</span><span class="w"> </span><span class="s">"a_Position"</span><span class="w"> </span><span class="p">}</span>
+<span class="p">};</span>
+
+<span class="n">m_VertexBuffer</span><span class="o">-&gt;</span><span class="n">SetLayout</span><span class="p">(</span><span class="n">layout</span><span class="p">);</span>
+</code></pre></div>
+
+<p>在这个阶段，布局会自动得到：</p>
+<ul>
+<li><code>Float3.Size = 12</code>；</li>
+<li><code>a_Position.Offset = 0</code>；</li>
+<li><code>Stride = 12</code>。</li>
+</ul>
+<p>运行结果与原三角形一致，说明读取一个三浮点位置仍然正确。这个验证很重要，因为后续一旦 stride 或 offset 计算错误，三角形会消失、变形，或者把颜色数据误读为顶点坐标。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[仅位置布局] --&gt; B[Offset 0]
+    A --&gt; C[Size 12]
+    A --&gt; D[Stride 12]
+    D --&gt; E[三角形保持原样]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_41_00.png" alt="单一 Float3 属性仍能正确渲染原三角形" loading="lazy">
+  <p class="video-caption">📷 单一 Float3 属性仍能正确渲染原三角形<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=2460" target="_blank" rel="noopener">回到原视频 (00:41:00)</a></p>
+</div>
+
+<h2 id="16">16. 加入颜色后，布局自动变化</h2>
+<p><em>(参考时间: 00:41:04)</em></p>
+<p>顶点数组从每个顶点 3 个浮点扩展为 7 个浮点：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">float</span><span class="w"> </span><span class="n">vertices</span><span class="p">[</span><span class="mi">3</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">7</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="mf">-0.5f</span><span class="p">,</span><span class="w"> </span><span class="mf">-0.5f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">,</span><span class="w">  </span><span class="mf">0.8f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.2f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.8f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0f</span><span class="p">,</span>
+<span class="w">     </span><span class="mf">0.5f</span><span class="p">,</span><span class="w"> </span><span class="mf">-0.5f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">,</span><span class="w">  </span><span class="mf">0.2f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.3f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.8f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0f</span><span class="p">,</span>
+<span class="w">     </span><span class="mf">0.0f</span><span class="p">,</span><span class="w">  </span><span class="mf">0.5f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">,</span><span class="w">  </span><span class="mf">0.8f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.8f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.2f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0f</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>布局增加第二个元素：</p>
+<div class="highlight"><pre><span></span><code><span class="n">BufferLayout</span><span class="w"> </span><span class="n">layout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="n">ShaderDataType</span><span class="o">::</span><span class="n">Float3</span><span class="p">,</span><span class="w"> </span><span class="s">"a_Position"</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="n">ShaderDataType</span><span class="o">::</span><span class="n">Float4</span><span class="p">,</span><span class="w"> </span><span class="s">"a_Color"</span><span class="w"> </span><span class="p">}</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>自动计算结果变为：</p>
+<ul>
+<li><code>a_Position.Size = 12</code>，<code>Offset = 0</code>；</li>
+<li><code>a_Color.Size = 16</code>，<code>Offset = 12</code>；</li>
+<li><code>Stride = 28</code>。</li>
+</ul>
+<p>最先只把颜色放进顶点缓冲，不修改 Shader 对颜色的使用方式。结果仍是原来的三角形，说明新的 stride 与第一个属性的 offset 没有破坏位置读取。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[一条顶点记录 28 bytes] --&gt; B[0..11 a_Position Float3]
+    A --&gt; C[12..27 a_Color Float4]
+    B --&gt; D[location 0]
+    C --&gt; E[location 1]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_42_50.png" alt="增加颜色属性后，布局自动把 Stride 更新为 28 字节" loading="lazy">
+  <p class="video-caption">📷 增加颜色属性后，布局自动把 Stride 更新为 28 字节<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=2570" target="_blank" rel="noopener">回到原视频 (00:42:50)</a></p>
+</div>
+
+<h2 id="17-shader">17. Shader 传递颜色与黑三角形调试</h2>
+<p><em>(参考时间: 00:42:28)</em></p>
+<p>Vertex Shader 接收颜色并交给 Fragment Shader：</p>
+<div class="highlight"><pre><span></span><code><span class="k">layout</span><span class="p">(</span><span class="n">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mo">0</span><span class="p">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="kt">vec3</span><span class="w"> </span><span class="n">a_Position</span><span class="p">;</span>
+<span class="k">layout</span><span class="p">(</span><span class="n">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="kt">vec4</span><span class="w"> </span><span class="n">a_Color</span><span class="p">;</span>
+
+<span class="k">out</span><span class="w"> </span><span class="kt">vec3</span><span class="w"> </span><span class="n">v_Position</span><span class="p">;</span>
+<span class="k">out</span><span class="w"> </span><span class="kt">vec4</span><span class="w"> </span><span class="n">v_Color</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="n">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">v_Position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a_Position</span><span class="p">;</span>
+<span class="w">    </span><span class="n">v_Color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a_Color</span><span class="p">;</span>
+<span class="w">    </span><span class="nb">gl_Position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">vec4</span><span class="p">(</span><span class="n">a_Position</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Fragment Shader 增加同名的输入：</p>
+<div class="highlight"><pre><span></span><code><span class="k">in</span><span class="w"> </span><span class="kt">vec3</span><span class="w"> </span><span class="n">v_Position</span><span class="p">;</span>
+<span class="k">in</span><span class="w"> </span><span class="kt">vec4</span><span class="w"> </span><span class="n">v_Color</span><span class="p">;</span>
+<span class="k">layout</span><span class="p">(</span><span class="n">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mo">0</span><span class="p">)</span><span class="w"> </span><span class="k">out</span><span class="w"> </span><span class="kt">vec4</span><span class="w"> </span><span class="n">color</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="n">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">vec4</span><span class="p">(</span><span class="n">v_Position</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">0.5</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+<span class="w">    </span><span class="n">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v_Color</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>第一次运行出现黑三角形。问题不是布局、stride 或 offset，而是 Vertex Shader 中还没有把输入颜色赋给输出 <code>v_Color</code>。补上赋值后，颜色重新出现在三角形上。</p>
+<p>这个插曲说明：抽象层计算正确，不代表 Shader 数据链路完整。调试时要分别检查：</p>
+<ul>
+<li>CPU 顶点数据是否包含颜色；</li>
+<li>Vertex Buffer 是否上传了完整记录；</li>
+<li>布局的 offset 与 stride 是否正确；</li>
+<li>Shader 是否声明并连接了对应属性；</li>
+<li>Vertex Shader 是否把值传给 Fragment Shader。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[黑三角形] --&gt; B{顶点颜色在 GPU 中吗}
+    B -- 是 --&gt; C{布局配置正确吗}
+    C -- 是 --&gt; D{Shader 输出 v_Color 吗}
+    D -- 否 --&gt; E[补上 v_Color = a_Color]
+    E --&gt; F[颜色恢复]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_42_57.png" alt="黑三角形来自 Shader 未输出顶点颜色，而不是 BufferLayout 错误" loading="lazy">
+  <p class="video-caption">📷 黑三角形来自 Shader 未输出顶点颜色，而不是 BufferLayout 错误<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=2577" target="_blank" rel="noopener">回到原视频 (00:42:57)</a></p>
+</div>
+
+<h2 id="18">18. 颜色插值与最终视觉结果</h2>
+<p><em>(参考时间: 00:43:16)</em></p>
+<p>每个顶点在数组中拥有独立颜色。Vertex Shader 输出颜色后，光栅化阶段会在三角形内部对颜色进行插值：</p>
+<ul>
+<li>顶点 0 偏粉；</li>
+<li>顶点 1 偏蓝；</li>
+<li>顶点 2 偏黄；</li>
+<li>三角形中心由三者平滑混合。</li>
+</ul>
+<p>第一轮使用接近纯色的 <code>1.0</code>、<code>0.0</code> 组合，颜色过于刺眼。讲师随后把分量调整为 <code>0.8</code>、<code>0.2</code> 等值，保留不同顶点的颜色差异，同时降低饱和度和视觉冲击。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[顶点 0 颜色] --&gt; D[光栅化插值]
+    B[顶点 1 颜色] --&gt; D
+    C[顶点 2 颜色] --&gt; D
+    D --&gt; E[三角形内部渐变]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_43_39.png" alt="三个顶点颜色经过插值形成渐变三角形" loading="lazy">
+  <p class="video-caption">📷 三个顶点颜色经过插值形成渐变三角形<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=2619" target="_blank" rel="noopener">回到原视频 (00:43:39)</a></p>
+</div>
+
+<h2 id="19-const">19. 收尾：局部布局、const 迭代器与最终代码</h2>
+<p><em>(参考时间: 00:44:23)</em></p>
+<p>布局对象可以作为临时局部值传入 <code>SetLayout()</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">    </span><span class="n">BufferLayout</span><span class="w"> </span><span class="n">layout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="n">ShaderDataType</span><span class="o">::</span><span class="n">Float3</span><span class="p">,</span><span class="w"> </span><span class="s">"a_Position"</span><span class="w"> </span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="n">ShaderDataType</span><span class="o">::</span><span class="n">Float4</span><span class="p">,</span><span class="w"> </span><span class="s">"a_Color"</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="p">};</span>
+
+<span class="w">    </span><span class="n">m_VertexBuffer</span><span class="o">-&gt;</span><span class="n">SetLayout</span><span class="p">(</span><span class="n">layout</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>离开作用域后，局部 <code>layout</code> 被销毁，但 <code>OpenGLVertexBuffer</code> 保存的是副本，所以渲染不受影响。</p>
+<p>最终读取布局时使用 const 引用，并把循环整理为：</p>
+<div class="highlight"><pre><span></span><code><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">layout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">m_VertexBuffer</span><span class="o">-&gt;</span><span class="n">GetLayout</span><span class="p">();</span>
+
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">element</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">layout</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="c1">// 根据 element 配置顶点属性</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这一版代码同时具备可读性和数据驱动能力：</p>
+<ul>
+<li>代码中能直接看出 <code>Float3 a_Position</code> 与 <code>Float4 a_Color</code>；</li>
+<li>新增属性只需要修改顶点数据和布局；</li>
+<li>stride 与 offset 不再靠手工维护；</li>
+<li>OpenGL 专用类型转换仍被限制在应用层的局部 helper 中；</li>
+<li>未来抽象 Vertex Array 时，可以把属性配置整体移入平台实现。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[定义 vertices] --&gt; B[创建 VertexBuffer]
+    B --&gt; C[构造 BufferLayout]
+    C --&gt; D[SetLayout 保存副本]
+    D --&gt; E[GetLayout 返回 const 引用]
+    E --&gt; F[自动配置所有属性]
+    F --&gt; G[Shader 使用 location 读取]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_45_39.png" alt="最终代码通过自动引用和范围 for 完成布局驱动的属性配置" loading="lazy">
+  <p class="video-caption">📷 最终代码通过自动引用和范围 for 完成布局驱动的属性配置<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31&t=2739" target="_blank" rel="noopener">回到原视频 (00:45:39)</a></p>
+</div>
+
+<h2 id="20">20. 当前边界与下一步</h2>
+<p><em>(参考时间: 00:46:40)</em></p>
+<p>本讲已经让 Vertex Buffer 拥有布局描述，但属性配置代码仍直接写在 <code>Application.cpp</code>：</p>
+<ul>
+<li>仍然直接包含 Glad；</li>
+<li>仍然直接调用 <code>glEnableVertexAttribArray()</code>；</li>
+<li>仍然直接调用 <code>glVertexAttribPointer()</code>；</li>
+<li>仍然由应用层维护 VAO；</li>
+<li><code>ShaderDataTypeToOpenGLBaseType()</code> 仍是一个临时 helper。</li>
+</ul>
+<p>下一讲应把属性配置移入 OpenGL Vertex Array 实现，让应用只负责：</p>
+<ol>
+<li>创建 Vertex Buffer；</li>
+<li>创建 Vertex Array；</li>
+<li>把带布局的 Vertex Buffer 交给 Vertex Array；</li>
+<li>绑定 Vertex Array 并发出 Draw Call。</li>
+</ol>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[本讲: VertexBuffer + BufferLayout] --&gt; B[下一讲: VertexArray]
+    B --&gt; C[属性配置进入 OpenGL 平台层]
+    C --&gt; D[Application 不再调用 Glad]
+    D --&gt; E[更完整的跨 API 抽象]
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Application] --&gt; B[VertexArray interface]
+    B --&gt; C[OpenGLVertexArray]
+    C --&gt; D[VertexBuffer]
+    C --&gt; E[BufferLayout]
+    C --&gt; F[glVertexAttribPointer]
+    A --&gt; G[Renderer / Draw Call]
+</code></pre></div>
+
+<h2 id="21">21. 本节结论</h2>
+<p>本讲完成了 Hazel 顶点缓冲区布局系统的第一版：</p>
+<ul>
+<li>明确 Vertex Buffer 只是数据，Vertex Array 保存读取状态；</li>
+<li>建立跨 API 的 <code>ShaderDataType</code>；</li>
+<li>建立 <code>BufferElement</code>，保存名称、类型、大小、偏移和归一化标志；</li>
+<li>建立 <code>BufferLayout</code>，从初始化列表构造并自动计算 offset 与 stride；</li>
+<li>为布局提供 getter、迭代器和 const 迭代器；</li>
+<li>为 <code>VertexBuffer</code> 增加 <code>GetLayout()</code> 与 <code>SetLayout()</code>；</li>
+<li>在 OpenGL 实现中保存布局副本；</li>
+<li>按布局自动配置 component count、基础类型、normalized、stride 和 offset；</li>
+<li>用位置与颜色两个属性验证 stride 和 offset；</li>
+<li>通过黑三角形问题确认 Shader 数据链路也必须完整；</li>
+<li>把 Vertex Array 抽象列为下一阶段任务。</li>
+</ul>
+<p>这套设计的价值不在隐藏少量 OpenGL 调用，而在把“内存中一条顶点记录长什么样”变成所有渲染后端都能理解、客户端开发者也能一眼看懂的描述。</p>
+<h2 id="_2">附：参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=31">Bilibili 精译视频：031 - 顶点缓冲区布局</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/tree/e8eef16">本期对应代码提交 <code>e8eef16</code></a></li>
+<li><a href="https://www.khronos.org/opengl/wiki/Vertex_Specification">OpenGL Wiki：Vertex Specification</a></li>
+<li><a href="https://www.khronos.org/opengl/wiki/Buffer_Object">OpenGL Wiki：Buffer Object</a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>
