@@ -68,6 +68,10 @@
   - [Markdown 版本](<Hazel Game Engine/029 - OpenGL Shaders/book.md>)
   - 视频来源：[Bilibili 精译版第 29 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=29)
   - 主题：Vertex/Fragment Shader、图形管线、编译与链接、`Shader` 类、Raw String、红色三角形、Varying 数据与颜色插值
+- [030 - 渲染器 API 抽象](<Hazel Game Engine/030 - Renderer API Abstraction/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/030 - Renderer API Abstraction/book.md>)
+  - 视频来源：[Bilibili 精译版第 30 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=30)
+  - 主题：编译期与运行期渲染后端、`RendererAPI`、`VertexBuffer`/`IndexBuffer` 接口、OpenGL 实现和工厂分派
 
 ## 南京大学操作系统原理 2026
 
