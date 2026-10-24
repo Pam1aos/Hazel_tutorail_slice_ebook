@@ -92,6 +92,10 @@
   - [Markdown 版本](<Hazel Game Engine/035 - Creating an Orthographic Camera/book.md>)
   - 视频来源：[Bilibili 精译版第 35 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=35)
   - 主题：`OrthographicCamera`、View/Projection/VP、矩阵 uniform 上传、宽高比修复和相机变换调试
+- [039 - 材质系统](<Hazel Game Engine/039 - Material Systems/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/039 - Material Systems/book.md>)
+  - 视频来源：[Bilibili 精译版第 39 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=39)
+  - 主题：Material 与 Material Instance、uniform 归属、平色实验、材质排序、Shader 反射和 2D/3D 路线选择
 
 ## 南京大学操作系统原理 2026
 

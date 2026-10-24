@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 039：材质系统</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: #f3f4f6; font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+            code { overflow-wrap: anywhere; word-break: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-039">Hazel 游戏引擎笔记 039：材质系统</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39">The Cherno 游戏引擎系列第 39 集“039 - 材质系统”</a>，时长约 32 分 04 秒。</p>
+<p>原课程与 Hazel 代码作者：The Cherno。公开代码参考快照：<a href="https://github.com/TheCherno/Hazel/tree/3c14780"><code>3c14780</code></a>，其中包括 <code>OpenGLShader::UploadUniformFloat4()</code> 等同阶段 uniform 上传接口。</p>
+<p><strong>编者说明：</strong> 本讲是一次概念导览和临时代码实验，不是 Material 系统的最终实现。视频中的 <code>Material</code>、<code>MaterialInstance</code> 和渲染器提交接口属于讲师展示的目标 API 草案；当时公开仓库尚无独立的 <code>Material.h</code> 提交。本文把“视频实际写过的试验代码”和“讲师规划的未来接口”分开说明。</p>
+<p>本文由视频 ASR 转写稿重构、翻译并整理，不是官方教材；术语、代码和设计判断以原视频及同阶段 Hazel 仓库为准。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>第 35 集把相机、变换和 <code>Renderer::Submit()</code> 串进了同一条渲染路径。本讲暂时不继续堆叠功能，而是先回答一个更基础的问题：<strong>当两个物体使用同一个 Shader，却要呈现不同表面外观时，数据应该放在哪里？</strong></p>
+<p>本讲要建立以下认识：</p>
+<ul>
+<li>Shader 是运行在 GPU 上的程序，负责顶点位置和最终像素颜色；</li>
+<li>在 Shader 中硬编码颜色能工作，但会失去复用价值；</li>
+<li>Uniform 是在绘制前传给 Shader 的数据；</li>
+<li>Material 的简化定义是 <strong>Shader + 一组属于表面外观的 Uniform 数据</strong>；</li>
+<li>不是所有 Uniform 都属于 Material，ViewProjection、光源方向等通常由 Renderer 负责；</li>
+<li>单个“万能 Shader”会引入大量分支和变体，真实引擎通常从模块生成多个特化 Shader；</li>
+<li>Mesh 通常与 Material 一起被创作和保存，但在代码中也可以分开控制；</li>
+<li>Material Instance 共享一个基础 Material 的 Shader 和参数布局，只覆盖每个实例不同的数据；</li>
+<li>按 Material 排序能减少 Shader、Uniform 和 Material 状态切换；</li>
+<li>纹理、粗糙度、金属度、法线等表面数据都可以沿同一套 Material 接口接入；</li>
+<li>要实现可靠的 Material 系统，Shader 类还必须先支持反射、参数校验、文件加载和批量 uniform 存储；</li>
+<li>本讲最后留下了一个课程方向问题：先完成快速、可玩的 2D 渲染器，还是立即投入完整 3D 渲染器。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[Shader Code] --&gt; B[Compiled Shader Program]
+    C[Material Data] --&gt; D[Material]
+    B --&gt; D
+    D --&gt; E[Per-object Uniform Upload]
+    E --&gt; F[GPU Draw]
+    F --&gt; G[Surface Appearance]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_01_27.png" alt="上一集已有相机、变换和一批可独立绘制的方块" loading="lazy">
+  <p class="video-caption">📷 上一集已有相机、变换和一批可独立绘制的方块<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=87" target="_blank" rel="noopener">回到原视频 (00:01:27)</a></p>
+</div>
+
+<h2 id="1">1. 当前引擎已经能做什么</h2>
+<p><em>(参考时间：00:01:18)</em></p>
+<p>上一集结束时，Sandbox 已经能够：</p>
+<ul>
+<li>绘制一个带顶点颜色的三角形；</li>
+<li>用相机移动、旋转视角；</li>
+<li>用相对位置构建一片方块网格；</li>
+<li>为每个方块提交独立的 Transform；</li>
+<li>由 <code>Renderer::Submit()</code> 绑定 Shader、上传场景与对象 uniform，再发出 Draw Call。</li>
+</ul>
+<p>这些方块目前共用同一个平色 Shader。它们的位置不同，但表面颜色和着色逻辑相同。</p>
+<p>现在提出一个新需求：</p>
+<blockquote>
+<p>同一块方块几何，能否在绘制时选择红色或蓝色？</p>
+</blockquote>
+<p>最直接的办法是修改片段 Shader，把输出颜色固定成红色：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#version 330 core</span>
+
+<span class="k">layout</span><span class="p">(</span><span class="n">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mo">0</span><span class="p">)</span><span class="w"> </span><span class="k">out</span><span class="w"> </span><span class="kt">vec4</span><span class="w"> </span><span class="n">color</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="n">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">vec4</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这当然能让画面变红。但接下来想要蓝色时，又得再写一个 Shader；想要紫色、绿色，或让颜色由编辑器实时调整时，还要继续复制代码。</p>
+<p>问题不在于“能不能写死颜色”，而在于这种方式不能充分复用 Shader。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_10_58.png" alt="当前 Sandbox 与 Shader 源码的起点" loading="lazy">
+  <p class="video-caption">📷 当前 Sandbox 与 Shader 源码的起点<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=658" target="_blank" rel="noopener">回到原视频 (00:10:58)</a></p>
+</div>
+
+<h2 id="2">2. 从“固定程序”到“带输入的程序”</h2>
+<p><em>(参考时间：00:02:49)</em></p>
+<p>讲师用普通程序作类比：如果程序只能计算 <code>10 + 5</code>，它当然能给出一次正确答案，但工具价值很低。更有用的写法是接收两个输入：</p>
+<div class="highlight"><pre><span></span><code>add(a, b)
+</code></pre></div>
+
+<p>这样无论输入是 <code>10 + 5</code>、<code>2 + 3</code>，还是运行时由用户提供的数据，程序都能复用。</p>
+<p>Shader 也一样。不要让“红色”成为程序本身，而要让颜色成为 Shader 的输入：</p>
+<div class="highlight"><pre><span></span><code>flat_color(inputColor)
+</code></pre></div>
+
+<p>于是同一个 Shader 可以：</p>
+<ul>
+<li>接收红色，输出红色；</li>
+<li>接收蓝色，输出蓝色；</li>
+<li>接收材质编辑器中的任意颜色；</li>
+<li>以后进一步接收纹理、粗糙度和金属度等表面参数。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Hardcoded Shader] --&gt; B[One output only]
+    C[Parameterized Shader] --&gt; D[Input Color]
+    D --&gt; E[Red]
+    D --&gt; F[Blue]
+    D --&gt; G[Any Color]
+</code></pre></div>
+
+<p>讲师强调，这类 Shader 通常由引擎工程师或技术美术编写。使用 Shader 的美术人员不必理解 GPU 指令和光照公式，只需要给暴露出来的端口填入颜色、纹理和表面参数。</p>
+<h2 id="3-material">3. Material 的简化定义</h2>
+<p><em>(参考时间：00:05:49)</em></p>
+<p>Regular draw 之前，CPU 可以把一组数据传给当前 Shader，这类数据称为 <strong>Uniform</strong>。同一个 Uniform 在整次 Draw Call 中保持不变，因此非常适合表达“这次绘制使用什么表面参数”。</p>
+<p>由此得到本讲反复强调的核心定义：</p>
+<div class="highlight"><pre><span></span><code>Material = Shader + Uniform Data
+</code></pre></div>
+
+<p>更准确地说，是一组<strong>决定表面外观的</strong> Uniform 数据，而不是 Shader 中出现的所有 Uniform。</p>
+<p>材质可以描述：</p>
+<ul>
+<li>基础颜色；</li>
+<li>反照率纹理；</li>
+<li>粗糙或光滑程度；</li>
+<li>金属、塑料等表面类型；</li>
+<li>法线贴图；</li>
+<li>高光贴图或破损贴图；</li>
+<li>未来 PBR 系统中的其他表面参数。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Shader Program] --&gt; D[Material]
+    B[Base Color] --&gt; C[Material Uniforms]
+    E[Texture] --&gt; C
+    F[Roughness] --&gt; C
+    G[Metallic] --&gt; C
+    H[Normal Map] --&gt; C
+    C --&gt; D
+    D --&gt; I[Surface Appearance]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_04_20.png" alt="材质参数可以来自颜色、纹理和表面的物理属性" loading="lazy">
+  <p class="video-caption">📷 材质参数可以来自颜色、纹理和表面的物理属性<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=260" target="_blank" rel="noopener">回到原视频 (00:04:20)</a></p>
+</div>
+
+<p>这不是 Hazel 独有的定义，而是很多游戏引擎都采用的抽象：Shader 提供算法和参数接口，Material 提供这一表面在算法中的具体输入。</p>
+<h2 id="4-uniform">4. 并非所有 Uniform 都属于材质</h2>
+<p><em>(参考时间：00:06:00)</em></p>
+<p>视频当前的 Vertex Shader 中已经有：</p>
+<div class="highlight"><pre><span></span><code><span class="k">uniform</span><span class="w"> </span><span class="kt">mat4</span><span class="w"> </span><span class="n">u_ViewProjection</span><span class="p">;</span>
+<span class="k">uniform</span><span class="w"> </span><span class="kt">mat4</span><span class="w"> </span><span class="n">u_Transform</span><span class="p">;</span>
+</code></pre></div>
+
+<p>这两个 Uniform 是渲染过程必需的数据，但不应塞进材质：</p>
+<ul>
+<li><code>u_ViewProjection</code> 由相机和场景决定；</li>
+<li><code>u_Transform</code> 由对象在世界中的位置、旋转和缩放决定。</li>
+</ul>
+<p>如果未来加入光照，<code>u_LightDirection</code> 也不会因为某个表面材质变化而改变。讲师在很后面再次用一个兔子模型作类比：改变灯光方向，不会改变兔子的材质本身；兔子只是对不同光照作出材质表面应有的响应。</p>
+<p>因此不能采用“把 Shader 中所有 Uniform 全部拿来当 Material 字段”的简单方案。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Uniforms in a Shader] --&gt; B[Renderer-owned]
+    A --&gt; C[Material-owned]
+    B --&gt; D[ViewProjection]
+    B --&gt; E[Transform]
+    B --&gt; F[Light Direction]
+    B --&gt; G[Camera Position]
+    C --&gt; H[Base Color]
+    C --&gt; I[Roughness]
+    C --&gt; J[Metallic]
+    C --&gt; K[Surface Textures]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_19_25.png" alt="兔子的材质决定它如何响应灯光，但材质不包含灯光方向" loading="lazy">
+  <p class="video-caption">📷 兔子的材质决定它如何响应灯光，但材质不包含灯光方向<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=1165" target="_blank" rel="noopener">回到原视频 (00:19:25)</a></p>
+</div>
+
+<p>这也是材质系统真正困难的地方之一：引擎必须知道哪些参数由谁提供、何时上传，以及同名参数在当前 Shader 中是否存在。</p>
+<h2 id="5-shader-shader">5. “万能 Shader”与 Shader 变体</h2>
+<p><em>(参考时间：00:06:58)</em></p>
+<p>一种看似省事的做法是写一个 Über Shader，把游戏可能需要的所有功能都放进去，再用大量 <code>if</code> 或编译期开关选择行为。</p>
+<p>这种方式通常会带来两个问题：</p>
+<ul>
+<li>GPU 可能为根本不会执行的分支付出代价；</li>
+<li>一个巨大的 Shader 越来越难维护、调试和优化。</li>
+</ul>
+<p>更常见的做法是建立 Shader 编译系统：源码中写可组合的代码块，根据材质所需功能生成对应的 Shader 变体。</p>
+<p>例如，源码可以定义是否使用纹理、是否使用法线贴图、是否接收某种光照。编译系统据此生成多个特化版本。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[Shader Modules / Source] --&gt; B[Feature Selection]
+    B --&gt; C[Variant: Flat Color]
+    B --&gt; D[Variant: Textured]
+    B --&gt; E[Variant: Textured + Normal]
+    B --&gt; F[Variant: PBR]
+</code></pre></div>
+
+<p>讲师说：“你只写了一个 Shader，却可能得到 300 个 Shader。”这并不意味着源代码要复制 300 次，而是同一套模块可以生成 300 个针对不同功能组合的 GPU 程序。</p>
+<p>这个编译系统本讲不会实现，只先建立概念。</p>
+<h2 id="6-geometry-material">6. Geometry 与 Material 的关系</h2>
+<p><em>(参考时间：00:08:02)</em></p>
+<p>本讲的实践目标很小：</p>
+<ol>
+<li>让方块的片段 Shader 接收一个颜色 uniform；</li>
+<li>在沙盒代码中给不同方块上传红色或蓝色；</li>
+<li>证明“同一 Shader + 不同数据”能得到不同表面外观；</li>
+<li>再讨论应该如何把这种直接上传封装成 Material API。</li>
+</ol>
+<p>从更大的资产流程看，讲师特别提醒：几何体和材质通常不是完全分离的两件事。</p>
+<p>艺术家制作一个木桌模型时，通常也会给它指定木质表面。模型文件往往保存了几何、子网格以及各自的材质引用。若引擎只保存裸几何，而让每个使用者手动配材质，会很别扭。</p>
+<p>合理的资产关系通常接近：</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Mesh / Model] --&gt; B[Mesh Part A]
+    A --&gt; C[Mesh Part B]
+    B --&gt; D[Material A]
+    C --&gt; E[Material B]
+    D --&gt; F[Shader + Material Uniforms]
+    E --&gt; F
+</code></pre></div>
+
+<p>当然，把材质单独替换或覆盖仍然有合法用途，例如调试、换装、编辑器预览或运行时动态变化。但默认创作流程是“模型带着表面一起被制作”。</p>
+<h2 id="7">7. 材质系统的复杂度从哪里来</h2>
+<p><em>(参考时间：00:09:55)</em></p>
+<p>愿望可以写成一句话：</p>
+<blockquote>
+<p>让 Material 保存 Shader，并允许设置任意数据。</p>
+</blockquote>
+<p>真正开始设计时，问题会迅速变多：</p>
+<ul>
+<li>怎样知道某个 Shader 需要哪些 uniform？</li>
+<li>参数不存在时，是静默忽略、记录日志还是断言？</li>
+<li>怎样把整数、浮点、向量、矩阵、纹理统一成类型安全的数据？</li>
+<li>每个参数逐次调用 <code>glGetUniformLocation()</code>，还是编译时缓存位置？</li>
+<li>怎样把多个参数打包成 uniform buffer / constant buffer？</li>
+<li>Renderer 和 Material 是否应各自拥有一个常量缓冲区？</li>
+<li>参数修改后，什么时候同步到 GPU？</li>
+<li>一个 Material 被多个对象共享时，哪些数据能共享，哪些必须按实例覆盖？</li>
+</ul>
+<p>这些正是 Material 系统比“一个 Shader 类加一个 <code>SetColor()</code>”复杂得多的原因。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Shader Source] --&gt; B[Compile / Link]
+    B --&gt; C[Reflect Uniform Layout]
+    C --&gt; D[Validate Material Inputs]
+    D --&gt; E[Allocate CPU Backing Storage]
+    E --&gt; F[Pack Uniform Buffer]
+    F --&gt; G[Bind Shader + Buffer]
+    G --&gt; H[Draw]
+</code></pre></div>
+
+<p>本讲只做最小实验，但后面实现时逐项都绕不开。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_11_05.png" alt="先观察现有方块绘制循环，再准备直接上传颜色" loading="lazy">
+  <p class="video-caption">📷 先观察现有方块绘制循环，再准备直接上传颜色<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=665" target="_blank" rel="noopener">回到原视频 (00:11:05)</a></p>
+</div>
+
+<h2 id="8">8. 先做一个能工作的“半成品”</h2>
+<p><em>(参考时间：00:11:03)</em></p>
+<p>讲师先确认当前 Sandbox 的状态：</p>
+<ul>
+<li>Vertex Shader 已经接收 ViewProjection 和 Transform；</li>
+<li>Fragment Shader 还没有接收任何运行时 uniform；</li>
+<li>方块网格通过两层循环生成 400 个独立提交；</li>
+<li>方块当前使用统一下的平色 Shader。</li>
+</ul>
+<p>实验目标是生成一种红蓝交替的图案。</p>
+<p>在 Sandbox 中先准备两个颜色：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glm</span><span class="o">::</span><span class="n">vec4</span><span class="w"> </span><span class="n">redColor</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="mf">0.8f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.2f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.3f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0f</span><span class="w"> </span><span class="p">};</span>
+<span class="n">glm</span><span class="o">::</span><span class="n">vec4</span><span class="w"> </span><span class="n">blueColor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="mf">0.2f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.3f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.8f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0f</span><span class="w"> </span><span class="p">};</span>
+</code></pre></div>
+
+<p>视频的 <code>blueColor</code> 数值沿用了原来的蓝色方阵风格，<code>redColor</code> 则刻意调到相近亮度。颜色使用 <code>vec4</code>，前三个分量是 RGB，最后一个分量是 Alpha。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_11_39.png" alt="在沙盒中准备红色与蓝色两种材质数据" loading="lazy">
+  <p class="video-caption">📷 在沙盒中准备红色与蓝色两种材质数据<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=699" target="_blank" rel="noopener">回到原视频 (00:11:39)</a></p>
+</div>
+
+<p>目前的绘制循环类似：</p>
+<div class="highlight"><pre><span></span><code><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">20</span><span class="p">;</span><span class="w"> </span><span class="n">y</span><span class="o">++</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">20</span><span class="p">;</span><span class="w"> </span><span class="n">x</span><span class="o">++</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">glm</span><span class="o">::</span><span class="n">vec3</span><span class="w"> </span><span class="nf">pos</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">0.11f</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">0.11f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">);</span>
+<span class="w">        </span><span class="n">glm</span><span class="o">::</span><span class="n">mat4</span><span class="w"> </span><span class="n">transform</span><span class="w"> </span><span class="o">=</span>
+<span class="w">            </span><span class="n">glm</span><span class="o">::</span><span class="n">translate</span><span class="p">(</span><span class="n">glm</span><span class="o">::</span><span class="n">mat4</span><span class="p">(</span><span class="mf">1.0f</span><span class="p">),</span><span class="w"> </span><span class="n">pos</span><span class="p">)</span><span class="w"> </span><span class="o">*</span>
+<span class="w">            </span><span class="n">glm</span><span class="o">::</span><span class="n">scale</span><span class="p">(</span><span class="n">glm</span><span class="o">::</span><span class="n">mat4</span><span class="p">(</span><span class="mf">1.0f</span><span class="p">),</span><span class="w"> </span><span class="n">glm</span><span class="o">::</span><span class="n">vec3</span><span class="p">(</span><span class="mf">0.1f</span><span class="p">));</span>
+
+<span class="w">        </span><span class="n">Hazel</span><span class="o">::</span><span class="n">Renderer</span><span class="o">::</span><span class="n">Submit</span><span class="p">(</span><span class="n">m_FlatColorShader</span><span class="p">,</span><span class="w"> </span><span class="n">m_SquareVA</span><span class="p">,</span><span class="w"> </span><span class="n">transform</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>为了得到竖条交替效果，可以按列号 <code>x</code> 判断：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glm</span><span class="o">::</span><span class="n">vec4</span><span class="w"> </span><span class="n">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">redColor</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">blueColor</span><span class="p">;</span>
+</code></pre></div>
+
+<p><code>x = 0, 2, 4, ...</code> 使用红色，<code>x = 1, 3, 5, ...</code> 使用蓝色。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_12_18.png" alt="根据 `x % 2` 在红色与蓝色之间切换" loading="lazy">
+  <p class="video-caption">📷 根据 `x % 2` 在红色与蓝色之间切换<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=738" target="_blank" rel="noopener">回到原视频 (00:12:18)</a></p>
+</div>
+
+<h2 id="9-shader">9. 直接向 Shader 上传颜色</h2>
+<p><em>(参考时间：00:13:02)</em></p>
+<p>现有 Shader 接口还没有方便上传 <code>vec4</code> 的函数。讲师转到 OpenGL Shader 实现，添加 <code>UploadUniformFloat4()</code>。</p>
+<p>该函数的职责只有三步：</p>
+<ol>
+<li>用名字找到 uniform location；</li>
+<li>确认或处理找不到 location 的情况；</li>
+<li>调用 OpenGL 的 <code>glUniform4f()</code>，把四个浮点分量上传到当前 Shader。</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">OpenGLShader::UploadUniformFloat4</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">name</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">glm</span><span class="o">::</span><span class="n">vec4</span><span class="o">&amp;</span><span class="w"> </span><span class="n">value</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">GLint</span><span class="w"> </span><span class="n">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">glGetUniformLocation</span><span class="p">(</span><span class="n">m_RendererID</span><span class="p">,</span><span class="w"> </span><span class="n">name</span><span class="p">.</span><span class="n">c_str</span><span class="p">());</span>
+<span class="w">    </span><span class="n">glUniform4f</span><span class="p">(</span><span class="n">location</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">.</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">.</span><span class="n">y</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">.</span><span class="n">z</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">.</span><span class="n">w</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>对应声明可以放在平台实现类的公开接口中：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">UploadUniformFloat4</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">name</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">glm</span><span class="o">::</span><span class="n">vec4</span><span class="o">&amp;</span><span class="w"> </span><span class="n">value</span><span class="p">);</span>
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_13_47.png" alt="在 OpenGLShader 中补充 vec4 uniform 上传" loading="lazy">
+  <p class="video-caption">📷 在 OpenGLShader 中补充 vec4 uniform 上传<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=827" target="_blank" rel="noopener">回到原视频 (00:13:47)</a></p>
+</div>
+
+<p>OpenGL 的命名在这里容易让人犹豫：</p>
+<ul>
+<li><code>glUniform4f</code> 一次接收四个标量；</li>
+<li><code>glUniform4fv</code> 接收一个包含四个标量的指针或数组；</li>
+<li>这一段使用的是 <code>glUniform4f</code>。</li>
+</ul>
+<p>函数绑定的是当前正在使用的 Shader Program，所以调用它之前必须先绑定对应 Shader。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_14_45.png" alt="从现有 uniform 上传函数复制出 Float4 版本" loading="lazy">
+  <p class="video-caption">📷 从现有 uniform 上传函数复制出 Float4 版本<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=885" target="_blank" rel="noopener">回到原视频 (00:14:45)</a></p>
+</div>
+
+<h2 id="10-location">10. Location 查询与未来缓存</h2>
+<p><em>(参考时间：00:14:19)</em></p>
+<p>当前实现每次上传 uniform 都执行：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glGetUniformLocation</span><span class="p">(</span><span class="n">m_RendererID</span><span class="p">,</span><span class="w"> </span><span class="n">name</span><span class="p">.</span><span class="n">c_str</span><span class="p">());</span>
+</code></pre></div>
+
+<p>讲师提到，有观众建议缓存 location。这个方向是对的，但他不准备在临时实验里展开。</p>
+<p>更完整的做法是在 Shader 编译、链接完成后：</p>
+<ul>
+<li>解析或反射 Shader 中的 uniform；</li>
+<li>记录名称、类型、数组长度和 location；</li>
+<li>验证材料需要的参数是否真的存在；</li>
+<li>根据类型和布局计算 CPU 缓冲区大小；</li>
+<li>后续上传时直接复用已知 location；</li>
+<li>参数名拼错时尽早报告，而不是静默传入 <code>-1</code>。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Each Upload: Query Location] --&gt; B[Correct but repetitive]
+    C[Compile Shader] --&gt; D[Reflect All Uniforms]
+    D --&gt; E[Cache Name to Location]
+    E --&gt; F[Validate Material Fields]
+    F --&gt; G[Fast Upload / Pack Buffer]
+</code></pre></div>
+
+<p>这解释了为什么一个真正可靠的 Material 系统要从 Shader 层开始改造，而不是只在 Sandbox 里多写几个 <code>SetColor()</code>。</p>
+<h2 id="11-fragment-shader-u_color">11. 在 Fragment Shader 中声明 <code>u_Color</code></h2>
+<p><em>(参考时间：00:16:20)</em></p>
+<p>原来承担蓝色彩色输出的 Shader 被改造成更通用的平色 Shader，并在片段阶段添加：</p>
+<div class="highlight"><pre><span></span><code><span class="k">uniform</span><span class="w"> </span><span class="kt">vec4</span><span class="w"> </span><span class="n">u_Color</span><span class="p">;</span>
+</code></pre></div>
+
+<p><code>main()</code> 不再写死颜色，而是直接输出该 uniform：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#version 330 core</span>
+
+<span class="k">layout</span><span class="p">(</span><span class="n">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mo">0</span><span class="p">)</span><span class="w"> </span><span class="k">out</span><span class="w"> </span><span class="kt">vec4</span><span class="w"> </span><span class="n">color</span><span class="p">;</span>
+
+<span class="k">uniform</span><span class="w"> </span><span class="kt">vec4</span><span class="w"> </span><span class="n">u_Color</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="n">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">u_Color</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>也可以把颜色声明成 <code>vec3</code>，把 Alpha 固定为 <code>1.0</code>。这两种写法都能表达纯色表面，本讲为了和前面准备的 <code>glm::vec4</code> 数据保持一致，使用四分量形式。</p>
+<p>在 Sandbox 的每次提交前，根据列号选颜色并上传：</p>
+<div class="highlight"><pre><span></span><code><span class="k">auto</span><span class="w"> </span><span class="n">flatColorShader</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">dynamic_pointer_cast</span><span class="o">&lt;</span><span class="n">Hazel</span><span class="o">::</span><span class="n">OpenGLShader</span><span class="o">&gt;</span><span class="p">(</span><span class="n">m_FlatColorShader</span><span class="p">);</span>
+
+<span class="n">flatColorShader</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+
+<span class="n">glm</span><span class="o">::</span><span class="n">vec4</span><span class="w"> </span><span class="n">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">redColor</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">blueColor</span><span class="p">;</span>
+<span class="n">flatColorShader</span><span class="o">-&gt;</span><span class="n">UploadUniformFloat4</span><span class="p">(</span><span class="s">"u_Color"</span><span class="p">,</span><span class="w"> </span><span class="n">color</span><span class="p">);</span>
+
+<span class="n">Hazel</span><span class="o">::</span><span class="n">Renderer</span><span class="o">::</span><span class="n">Submit</span><span class="p">(</span><span class="n">m_FlatColorShader</span><span class="p">,</span><span class="w"> </span><span class="n">m_SquareVA</span><span class="p">,</span><span class="w"> </span><span class="n">transform</span><span class="p">);</span>
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_15_45.png" alt="在 Sandbox 中按列选择颜色并调用 `UploadUniformFloat4`" loading="lazy">
+  <p class="video-caption">📷 在 Sandbox 中按列选择颜色并调用 `UploadUniformFloat4`<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=945" target="_blank" rel="noopener">回到原视频 (00:15:45)</a></p>
+</div>
+
+<p>这里体现了 Uniform 的生命周期：它不随顶点变化，而是在一次绘制前统一传入，并在这一批片元执行中保持一致。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_16_31.png" alt="平色片元 Shader 改为读取 `u_Color`" loading="lazy">
+  <p class="video-caption">📷 平色片元 Shader 改为读取 `u_Color`<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=991" target="_blank" rel="noopener">回到原视频 (00:16:31)</a></p>
+</div>
+
+<h2 id="12">12. 红蓝交替结果与明显的性能问题</h2>
+<p><em>(参考时间：00:16:42)</em></p>
+<p>运行后，方阵变成红蓝相间的竖条。这个结果验证了两件事：</p>
+<ul>
+<li>同一个 Shader 可以生成不同外观；</li>
+<li>决定外观的数据确实可以由 CPU 在 Draw Call 前传入。</li>
+</ul>
+<p>从最简单意义上说，这已经做出了一个“材质”：Shader 提供通用平色逻辑，颜色 uniform 表示这次绘制使用什么表面颜色。</p>
+<p>但讲师马上强调：<strong>这只适合演示，不是理想渲染方式。</strong></p>
+<p>当前循环为了表现交替，每画一个方块就：</p>
+<ol>
+<li>切换或确认 Shader 状态；</li>
+<li>查询并上传一次颜色；</li>
+<li>上传对象 Transform；</li>
+<li>发出一次 Draw Call。</li>
+</ol>
+<p>当画面有 400 个方块时，就有大量重复状态切换。更合理的办法是把相同 Material 的物体放在一起绘制。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[400 Red / Blue Tiles] --&gt; B[Alternating Material Uploads]
+    B --&gt; C[Many Redundant State Changes]
+    A --&gt; D[Sort by Material]
+    D --&gt; E[Draw All Red]
+    E --&gt; F[Draw All Blue]
+    F --&gt; G[Far Fewer Material Bindings]
+</code></pre></div>
+
+<p>视频故意让这个缺点暴露出来，因为它正好说明 Material 不只是 UI 概念，也会直接决定渲染排序和批处理结构。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_16_42.png" alt="运行前的红蓝交替循环与 uniform 上传" loading="lazy">
+  <p class="video-caption">📷 运行前的红蓝交替循环与 uniform 上传<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=1002" target="_blank" rel="noopener">回到原视频 (00:16:42)</a></p>
+</div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_16_51.png" alt="演示成功：同一 Shader 通过不同颜色 uniform 画出红蓝方块" loading="lazy">
+  <p class="video-caption">📷 演示成功：同一 Shader 通过不同颜色 uniform 画出红蓝方块<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=1011" target="_blank" rel="noopener">回到原视频 (00:16:51)</a></p>
+</div>
+
+<h2 id="13-sandbox">13. 为什么不继续在 Sandbox 里手动上传</h2>
+<p><em>(参考时间：00:17:31)</em></p>
+<p>当前代码能工作，但 API 很别扭：</p>
+<div class="highlight"><pre><span></span><code><span class="n">shader</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="n">shader</span><span class="o">-&gt;</span><span class="n">UploadUniformFloat4</span><span class="p">(</span><span class="s">"u_Color"</span><span class="p">,</span><span class="w"> </span><span class="n">redColor</span><span class="p">);</span>
+<span class="n">Renderer</span><span class="o">::</span><span class="n">Submit</span><span class="p">(</span><span class="n">shader</span><span class="p">,</span><span class="w"> </span><span class="n">vertexArray</span><span class="p">,</span><span class="w"> </span><span class="n">transform</span><span class="p">);</span>
+</code></pre></div>
+
+<p>问题包括：</p>
+<ul>
+<li>调用者要知道底层 <code>OpenGLShader</code> 类型；</li>
+<li>调用者要记得先绑定 Shader；</li>
+<li>调用者要手写 uniform 名称；</li>
+<li>颜色与应用层、几何提交逻辑混在一起；</li>
+<li>参数拼错时容易静默失败；</li>
+<li>不同图形 API 的 uniform 上传方式不同；</li>
+<li>无法自然表达“这是同一个基础材质的不同实例”。</li>
+</ul>
+<p>所以讲师展示的是一个目标 API，而不是继续接受这种底层写法。</p>
+<h2 id="14-material-api">14. 目标 Material API</h2>
+<p><em>(参考时间：00:18:14)</em></p>
+<p>从使用者的角度看，希望可以创建 Material，并把 Shader 交给它：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Hazel</span><span class="o">::</span><span class="n">Ref</span><span class="o">&lt;</span><span class="n">Hazel</span><span class="o">::</span><span class="n">Material</span><span class="o">&gt;</span><span class="w"> </span><span class="n">flatColorMaterial</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">Hazel</span><span class="o">::</span><span class="n">Material</span><span class="o">::</span><span class="n">Create</span><span class="p">(</span><span class="n">m_FlatColorShader</span><span class="p">);</span>
+</code></pre></div>
+
+<p>然后设置属于材质的参数：</p>
+<div class="highlight"><pre><span></span><code><span class="n">flatColorMaterial</span><span class="o">-&gt;</span><span class="n">Set</span><span class="p">(</span><span class="s">"u_Color"</span><span class="p">,</span><span class="w"> </span><span class="n">redColor</span><span class="p">);</span>
+</code></pre></div>
+
+<blockquote>
+<p>以上及后文 Material API 是依据视频口述整理出的示意代码，并非本集公开的最终实现。</p>
+</blockquote>
+<p>Material 构造时可以做很多隐藏工作：</p>
+<ul>
+<li>保存 Shader 引用；</li>
+<li>读取 Shader 的参数定义；</li>
+<li>过滤出真正由材质控制的 uniform；</li>
+<li>分配 CPU 侧后备存储；</li>
+<li>设置各参数的默认值；</li>
+<li>准备上传数据；</li>
+<li>在绑定时绑定 Shader 并写入参数。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Shader] --&gt; B[Material::Create]
+    B --&gt; C[Read Material Uniforms]
+    C --&gt; D[Allocate Backing Storage]
+    D --&gt; E[Material]
+    E --&gt; F[Set Named Values]
+    F --&gt; G[Bind]
+    G --&gt; H[Bind Shader]
+    G --&gt; I[Upload Stored Values]
+</code></pre></div>
+
+<p>这样应用层不需要再关心 <code>glUniform4f</code>、location 查询或具体图形 API。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_18_18.png" alt="视频中展示的目标 Material API 草案" loading="lazy">
+  <p class="video-caption">📷 视频中展示的目标 Material API 草案<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=1098" target="_blank" rel="noopener">回到原视频 (00:18:18)</a></p>
+</div>
+
+<h2 id="15-materialmesh-override-material">15. Material、Mesh 与 Override Material</h2>
+<p><em>(参考时间：00:21:37)</em></p>
+<p>从渲染对象的角度，提交接口可以从“Shader + VertexArray”上升为“几何 + Material”：</p>
+<div class="highlight"><pre><span></span><code>Renderer::Submit(mesh, material, transform)
+</code></pre></div>
+
+<p>正常资产流程中，Mesh 往往自带 Material：</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Renderer::Submit] --&gt; B[Mesh]
+    B --&gt; C[Mesh Geometry]
+    B --&gt; D[Default Material]
+    C --&gt; E[Vertex Array]
+    D --&gt; F[Bind Material]
+    E --&gt; G[Draw]
+    F --&gt; G
+</code></pre></div>
+
+<p>但 Renderer 还可以接受一个 Override Material：</p>
+<div class="highlight"><pre><span></span><code>若 overrideMaterial 存在，就优先使用它；否则使用 Mesh 自带材质。
+</code></pre></div>
+
+<p>这适合：</p>
+<ul>
+<li>用纯色材质检查模型轮廓和几何；</li>
+<li>调试法线、UV 或光照；</li>
+<li>编辑器中的临时预览；</li>
+<li>特效、描边或特殊渲染通道。</li>
+</ul>
+<p>Override Material 不否定 Mesh/Material 的默认绑定关系，而是给渲染流程提供一个明确的替换入口。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_21_06.png" alt="Material 需要保存 Shader、材质参数与后备存储" loading="lazy">
+  <p class="video-caption">📷 Material 需要保存 Shader、材质参数与后备存储<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=1266" target="_blank" rel="noopener">回到原视频 (00:21:06)</a></p>
+</div>
+
+<h2 id="16-material-instance">16. Material Instance 解决什么问题</h2>
+<p><em>(参考时间：00:22:14)</em></p>
+<p>如果每换一种颜色就新建一个 Material，那么红材质、蓝材质、绿材质会各自成为完整材质。讲师更希望把“平色材质”作为基础定义，再从中派生出参数不同的实例。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Flat Color Material] --&gt; B[Red Material Instance]
+    A --&gt; C[Blue Material Instance]
+    A --&gt; D[Green Material Instance]
+    B --&gt; E[Same Shader / Layout]
+    C --&gt; E
+    D --&gt; E
+</code></pre></div>
+
+<p>Material Instance 的基本含义是：</p>
+<ul>
+<li>共享基础 Material 的 Shader；</li>
+<li>共享参数布局和默认值；</li>
+<li>只覆盖实例自己的参数数据；</li>
+<li>可被多个对象引用；</li>
+<li>绑定实例时，同时绑定 Shader 并上传它的数据。</li>
+</ul>
+<p>示意 API：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Hazel</span><span class="o">::</span><span class="n">Ref</span><span class="o">&lt;</span><span class="n">Hazel</span><span class="o">::</span><span class="n">MaterialInstance</span><span class="o">&gt;</span><span class="w"> </span><span class="n">redMaterial</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">Hazel</span><span class="o">::</span><span class="n">MaterialInstance</span><span class="o">::</span><span class="n">Create</span><span class="p">(</span><span class="n">flatColorMaterial</span><span class="p">);</span>
+
+<span class="n">redMaterial</span><span class="o">-&gt;</span><span class="n">Set</span><span class="p">(</span><span class="s">"u_Color"</span><span class="p">,</span><span class="w"> </span><span class="n">redColor</span><span class="p">);</span>
+
+<span class="n">Hazel</span><span class="o">::</span><span class="n">Ref</span><span class="o">&lt;</span><span class="n">Hazel</span><span class="o">::</span><span class="n">MaterialInstance</span><span class="o">&gt;</span><span class="w"> </span><span class="n">blueMaterial</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">Hazel</span><span class="o">::</span><span class="n">MaterialInstance</span><span class="o">::</span><span class="n">Create</span><span class="p">(</span><span class="n">flatColorMaterial</span><span class="p">);</span>
+
+<span class="n">blueMaterial</span><span class="o">-&gt;</span><span class="n">Set</span><span class="p">(</span><span class="s">"u_Color"</span><span class="p">,</span><span class="w"> </span><span class="n">blueColor</span><span class="p">);</span>
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_22_14.png" alt="Material 定义参数结构，Material Instance 保存每个表面实例的具体值" loading="lazy">
+  <p class="video-caption">📷 Material 定义参数结构，Material Instance 保存每个表面实例的具体值<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=1334" target="_blank" rel="noopener">回到原视频 (00:22:14)</a></p>
+</div>
+
+<h2 id="17-pbr">17. PBR 银材质与木材质实例</h2>
+<p><em>(参考时间：00:22:34)</em></p>
+<p>讲师用 PBR 银材质说明 Instance 的价值。</p>
+<p>基础 Material 可能是“银色金属”，定义：</p>
+<ul>
+<li>PBR 着色模型；</li>
+<li>银色基础色；</li>
+<li>金属工作流；</li>
+<li>法线、粗糙度、高光等参数槽位。</li>
+</ul>
+<p>场景中的不同球体可以派生不同 Material Instance：</p>
+<ul>
+<li>一个球表面较粗糙；</li>
+<li>一个球有局部磨损；</li>
+<li>一个球使用不同的划痕贴图；</li>
+<li>一个球的光泽程度不同。</li>
+</ul>
+<p>它们仍然是同一种银色金属基础，但在具体表面上有所不同。</p>
+<p>木材也是类似例子。一个场景可能有许多木桌、地板和家具，它们共享木质表面逻辑，却不是每块木头都有完全相同的纹理、颜色或老化程度。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Metal Base Material] --&gt; B[Polished Silver]
+    A --&gt; C[Rough Silver]
+    A --&gt; D[Damaged Silver]
+    B --&gt; E[Sphere A]
+    C --&gt; F[Sphere B]
+    D --&gt; G[Sphere C]
+</code></pre></div>
+
+<p>讲师在这里提到的另一层原因是批处理：物体会按相同 Material Instance 或基础 Material 分组，从而减少状态切换。</p>
+<h2 id="18-material-instance">18. 绑定 Material Instance 时实际发生什么</h2>
+<p><em>(参考时间：00:24:31)</em></p>
+<p>使用 Material 后，Sandbox 不再直接提交 Shader：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Hazel</span><span class="o">::</span><span class="n">Renderer</span><span class="o">::</span><span class="n">Submit</span><span class="p">(</span><span class="n">m_SquareVA</span><span class="p">,</span><span class="w"> </span><span class="n">redMaterial</span><span class="p">,</span><span class="w"> </span><span class="n">transform</span><span class="p">);</span>
+</code></pre></div>
+
+<p>Renderer 内部大致执行：</p>
+<div class="highlight"><pre><span></span><code>1. 取出 Material Instance 引用的 Material；
+2. 从 Material 取得 Shader；
+3. 绑定 Shader；
+4. 上传 Material Instance 保存的参数；
+5. 上传当前对象的 Transform；
+6. 绑定 VertexArray；
+7. 发出 Draw Call。
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant App as Sandbox
+    participant R as Renderer
+    participant MI as Material Instance
+    participant M as Material
+    participant S as Shader
+    participant GPU
+    App-&gt;&gt;R: Submit(VAO, MaterialInstance, Transform)
+    R-&gt;&gt;MI: Bind()
+    MI-&gt;&gt;M: Resolve Shader + Layout
+    M-&gt;&gt;S: Bind()
+    MI-&gt;&gt;S: Upload Instance Values
+    R-&gt;&gt;S: Upload Transform
+    R-&gt;&gt;GPU: Bind VAO + Draw
+</code></pre></div>
+
+<p>这样，应用层表达的是一次“用某材质绘制某几何”的意图，而不是一串图形 API 调用。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_24_40.png" alt="提交接口从 Shader 上升为 Material Instance" loading="lazy">
+  <p class="video-caption">📷 提交接口从 Shader 上升为 Material Instance<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=1480" target="_blank" rel="noopener">回到原视频 (00:24:40)</a></p>
+</div>
+
+<h2 id="19-400-2">19. 渲染排序：400 次材质切换变成 2 次</h2>
+<p><em>(参考时间：00:25:58)</em></p>
+<p>如果场景有 400 个方块，一半红色、一半蓝色，当前交替绘制会频繁切换。</p>
+<p>引入 Material Instance 后，Renderer 可以先把提交项收集起来，再按材质排序：</p>
+<div class="highlight"><pre><span></span><code>Red Material Instance   -&gt; Draw all red tiles
+Blue Material Instance  -&gt; Draw all blue tiles
+</code></pre></div>
+
+<p>理想情况下只需要绑定两次材质。每个对象仍然有不同 Transform，所以 Transform 仍需逐个上传或按批次处理，但不需要每次重复设置颜色。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[Collect Submissions] --&gt; B[Group by Material]
+    B --&gt; C[Bind Red Material]
+    C --&gt; D[Draw Every Red Tile + Per-object Transform]
+    D --&gt; E[Bind Blue Material]
+    E --&gt; F[Draw Every Blue Tile + Per-object Transform]
+</code></pre></div>
+
+<p>讲师称这种过程包含一种 render sorting。</p>
+<p>注意这并不是说“材质相同就一定可以一次 Draw Call”。完整的批处理还取决于：</p>
+<ul>
+<li>几何是否在同一缓冲区；</li>
+<li>是否能合并顶点与索引；</li>
+<li>是否使用同一 Shader 和材质；</li>
+<li>纹理绑定是否一致；</li>
+<li>实例化或其他批次机制是否可用；</li>
+<li>透明物体的排序约束。</li>
+</ul>
+<p>但至少按 Material 分组可以减少重复绑定和 uniform 设置，这是渲染排序最直接的一层收益。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_26_00.png" alt="按 Material 分组后，可以连续绘制相同材质的对象" loading="lazy">
+  <p class="video-caption">📷 按 Material 分组后，可以连续绘制相同材质的对象<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=1560" target="_blank" rel="noopener">回到原视频 (00:26:00)</a></p>
+</div>
+
+<h2 id="20">20. 纹理也走同一套材质接口</h2>
+<p><em>(参考时间：00:27:02)</em></p>
+<p>本讲还没有正式实现纹理，但纹理的归属方式与颜色相同：基色纹理、粗糙度贴图、法线贴图、破损贴图都属于某个材质的表面定义。</p>
+<p>示意接口可以写成：</p>
+<div class="highlight"><pre><span></span><code><span class="n">material</span><span class="o">-&gt;</span><span class="n">SetTexture</span><span class="p">(</span><span class="s">"u_AlbedoMap"</span><span class="p">,</span><span class="w"> </span><span class="n">albedoTexture</span><span class="p">);</span>
+<span class="n">material</span><span class="o">-&gt;</span><span class="n">SetTexture</span><span class="p">(</span><span class="s">"u_RoughnessMap"</span><span class="p">,</span><span class="w"> </span><span class="n">roughnessTexture</span><span class="p">);</span>
+<span class="n">material</span><span class="o">-&gt;</span><span class="n">SetValue</span><span class="p">(</span><span class="s">"u_Roughness"</span><span class="p">,</span><span class="w"> </span><span class="mf">0.35f</span><span class="p">);</span>
+</code></pre></div>
+
+<p>也可以使用更显式的 API：</p>
+<div class="highlight"><pre><span></span><code>SetValue(name, value)
+SetTexture(name, texture)
+</code></pre></div>
+
+<p>讲师强调，API 形式可以自行设计，关键是 Material 保存纹理引用，并在绑定时把纹理连同 Shader 所需参数一起准备好。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_27_10.png" alt="纹理引用与标量、颜色一样由 Material Instance 保存" loading="lazy">
+  <p class="video-caption">📷 纹理引用与标量、颜色一样由 Material Instance 保存<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=1630" target="_blank" rel="noopener">回到原视频 (00:27:10)</a></p>
+</div>
+
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Material Instance] --&gt; B[Color Values]
+    A --&gt; C[Scalar Values]
+    A --&gt; D[Texture References]
+    D --&gt; E[Albedo]
+    D --&gt; F[Roughness]
+    D --&gt; G[Normal]
+    D --&gt; H[Damage]
+    B --&gt; I[Bind Material]
+    C --&gt; I
+    D --&gt; I
+</code></pre></div>
+
+<h2 id="21">21. 材质系统的“安全性”</h2>
+<p><em>(参考时间：00:28:00)</em></p>
+<p>讲师非常喜欢 Material 概念的一点是，它像智能指针一样减少了裸露底层操作的机会。</p>
+<p>学习者第一次写 OpenGL 时，常见流程是：</p>
+<ol>
+<li>创建 Shader；</li>
+<li>写一个 <code>SetUniform*()</code>；</li>
+<li>调用 <code>glGetUniformLocation()</code>；</li>
+<li>如果 location 是 <code>-1</code>，记录错误或断言；</li>
+<li>手动保证参数名、类型和 Shader 一致。</li>
+</ol>
+<p>这些检查本身没错，只是分散在调用处，容易遗漏。</p>
+<p>更完整的 Material 系统可以在创建时询问 Shader：</p>
+<ul>
+<li>你有哪些 uniform？</li>
+<li>每个参数是什么类型？</li>
+<li>它们需要多少空间？</li>
+<li>哪些属于材质，哪些由 Renderer 提供？</li>
+</ul>
+<p>然后为材质分配一块后备 buffer，校验用户设置的参数，并按统一方式上传。这样错误能更早被发现，上层代码也更安全。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Manual Uniform Calls] --&gt; B[Easy Name Typo]
+    A --&gt; C[Repeated Location Lookup]
+    A --&gt; D[Type Mismatch Risk]
+    E[Material System] --&gt; F[Reflected Layout]
+    E --&gt; G[Validation]
+    E --&gt; H[Backing Buffer]
+    F --&gt; I[Safer API]
+    G --&gt; I
+    H --&gt; I
+</code></pre></div>
+
+<p>当然，“安全”来自正确的实现与校验，不是只要叫 <code>Material</code> 就自动可靠。</p>
+<h2 id="22-shader">22. 实现正式材质系统之前，Shader 还缺什么</h2>
+<p><em>(参考时间：00:29:02)</em></p>
+<p>本讲并没有把这些目标代码全部实施。讲师明确指出，要实现正式系统，至少还要继续扩展 Shader 类：</p>
+<ul>
+<li>从文件加载 Shader，而不是把 GLSL 字符串写在 C++ 中；</li>
+<li>解析或反射 uniform 参数；</li>
+<li>保存参数类型和 location；</li>
+<li>支持参数校验；</li>
+<li>读取所有材质相关 uniform；</li>
+<li>计算或创建 uniform buffer；</li>
+<li>管理 Shader 编译变体；</li>
+<li>统一不同图形 API 的 Shader 表示。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[Current String Shader] --&gt; B[File Loading]
+    B --&gt; C[Uniform Reflection]
+    C --&gt; D[Material Layout]
+    D --&gt; E[Uniform Buffer]
+    E --&gt; F[Validated Material API]
+</code></pre></div>
+
+<p>因此本节的价值更像是“先画出目标”，为后续 Shader 与 Texture 章节建立接口方向。</p>
+<h2 id="23-2d-3d">23. 2D 还是 3D：课程方向选择</h2>
+<p><em>(参考时间：00:29:12)</em></p>
+<p>视频最后，讲师正式提出课程路线问题：</p>
+<blockquote>
+<p>Hazel 现在应该先成为一个完整可用的 2D 引擎，还是立即投入完整 3D 渲染器？</p>
+</blockquote>
+<p>他给出的判断是：</p>
+<ul>
+<li>Material 系统对 3D 更重要；</li>
+<li>2D 场景通常只需要少数 Shader，颜色和纹理已能覆盖大部分内容；</li>
+<li>先把 2D 路径打磨完成，用户更快能做出真正的 2D 游戏；</li>
+<li>3D 渲染器会显著拉长开发周期；</li>
+<li>无论先选哪条路线，最后都希望 Hazel 同时支持 2D 和 3D；</li>
+<li>不管投票结果如何，Shader 类和纹理系统都要继续做；</li>
+<li>频道之外还有 OpenGL 系列可以继续承载 3D 教学。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Next Direction] --&gt; B[Polish 2D First]
+    A --&gt; C[Build Full 3D First]
+    B --&gt; D[Playable 2D Engine Sooner]
+    C --&gt; E[3D Renderer Sooner]
+    D --&gt; F[3D Follows]
+    E --&gt; G[2D Also Required]
+</code></pre></div>
+
+<p>这段路线讨论也解释了为什么本讲没有直接完成整套材质代码：下一阶段是优先 2D 还是 3D，会影响 Shader 和 Material 系统的复杂程度。</p>
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_30_45.png" alt="课程末尾关于 2D 与 3D 路线选择的讨论" loading="lazy">
+  <p class="video-caption">📷 课程末尾关于 2D 与 3D 路线选择的讨论<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39&t=1845" target="_blank" rel="noopener">回到原视频 (00:30:45)</a></p>
+</div>
+
+<h2 id="24">24. 本节结论</h2>
+<p>本讲从“给方块换颜色”这个小问题出发，给出了 Hazel 材质系统的基本方向：</p>
+<ul>
+<li>Shader 是可复用的 GPU 程序；</li>
+<li>不应为每种颜色复制 Shader；</li>
+<li>Uniform 在 Draw Call 前向 Shader 提供数据；</li>
+<li>简化地说，Material 是 Shader 与表面 uniform 数据的组合；</li>
+<li>Camera、Transform、Light 等数据通常由 Renderer 管理，不属于材质；</li>
+<li>视频通过 <code>UploadUniformFloat4()</code> 和 <code>u_Color</code> 完成了红蓝方块的临时实验；</li>
+<li>逐对象切换颜色会产生大量冗余状态，应按 Material 分组绘制；</li>
+<li>目标 API 用 Material 封装 Shader 与参数存储；</li>
+<li>Material Instance 共享基础材质布局，只保存实例差异；</li>
+<li>Override Material 可用于调试和特殊渲染；</li>
+<li>纹理及 PBR 表面参数可以沿同一接口扩展；</li>
+<li>正式实现前，Shader 还需要文件加载、反射、校验、缓存和缓冲区支持；</li>
+<li>第 39 集展示的是目标与试验，不是最终 Material 类；</li>
+<li>后续课程要在 2D 优先与 3D 优先之间做路线选择。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Shader Reuse Problem] --&gt; B[Uniform Input]
+    B --&gt; C[Direct u_Color Experiment]
+    C --&gt; D[Too Much Per-draw State]
+    D --&gt; E[Material: Shader + Data]
+    E --&gt; F[Material Instance Overrides]
+    F --&gt; G[Sort and Batch]
+    G --&gt; H[Textures + PBR Later]
+    H --&gt; I[Shader Reflection / Buffer Prerequisites]
+</code></pre></div>
+
+<h2 id="_2">附录：参考与延伸阅读</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=39">Bilibili 精译视频：039 - 材质系统</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/tree/3c14780">Hazel 公开代码参考快照 <code>3c14780</code></a></li>
+<li><a href="https://www.khronos.org/opengl/wiki/Shader_Compilation">OpenGL Wiki：Shader Compilation</a></li>
+<li><a href="https://www.khronos.org/opengl/wiki/Uniform">OpenGL Wiki：Uniform</a></li>
+<li><a href="https://www.khronos.org/opengl/wiki/Uniform_Buffer_Object">OpenGL Wiki：Uniform Buffer Object</a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>
