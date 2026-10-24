@@ -80,6 +80,10 @@
   - [Markdown 版本](<Hazel Game Engine/032 - Vertex Arrays/book.md>)
   - 视频来源：[Bilibili 精译版第 32 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=32)
   - 主题：`VertexArray` 抽象、共享资源生命周期、VAO/EBO 绑定状态、属性配置、第二个 VAO 与索引缓冲调试
+- [033 - 渲染流程与提交](<Hazel Game Engine/033 - Render Flow and Submission/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/033 - Render Flow and Submission/book.md>)
+  - 视频来源：[Bilibili 精译版第 33 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=33)
+  - 主题：`Renderer`、`RenderCommand`、`RendererAPI`、场景提交边界、OpenGL Draw Call 封装和 Glad 解耦
 
 ## 南京大学操作系统原理 2026
 

@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 033：渲染流程与提交</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: #f3f4f6; font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+            code { overflow-wrap: anywhere; word-break: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-033">Hazel 游戏引擎笔记 033：渲染流程与提交</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33">The Cherno 游戏引擎系列第 33 讲“渲染流程与提交”</a>，时长约 36 分 29 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。代码参考提交：<a href="https://github.com/TheCherno/Hazel/tree/dc9e382"><code>dc9e382</code></a>。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材；术语和代码以原视频及同期 Hazel 仓库为准。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>第 32 讲已经把顶点数组、顶点缓冲和索引缓冲封装起来，但 <code>Application::Run()</code> 中仍留着最后一条 OpenGL 专用代码：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glDrawElements</span><span class="p">(</span>
+<span class="w">    </span><span class="n">GL_TRIANGLES</span><span class="p">,</span>
+<span class="w">    </span><span class="n">vertexArray</span><span class="o">-&gt;</span><span class="n">GetIndexBuffer</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">GetCount</span><span class="p">(),</span>
+<span class="w">    </span><span class="n">GL_UNSIGNED_INT</span><span class="p">,</span>
+<span class="w">    </span><span class="nb">nullptr</span><span class="p">);</span>
+</code></pre></div>
+
+<p>这正是实际提交给 GPU 的 Draw Call。只要它还直接写在应用层，渲染后端就没有真正隐藏。</p>
+<p>本讲建立三层渲染架构：</p>
+<ul>
+<li><code>Renderer</code>：高层场景与对象提交流程；</li>
+<li><code>RenderCommand</code>：静态、原子化的底层命令入口；</li>
+<li><code>RendererAPI</code>：每个图形 API 的具体后端接口。</li>
+</ul>
+<p>本讲完成的内容：</p>
+<ul>
+<li>解释 Draw Call 实际做什么；</li>
+<li>区分场景级数据与对象级数据；</li>
+<li>设计 <code>BeginScene</code>、<code>Submit</code>、<code>EndScene</code> 流程；</li>
+<li>讨论未来命令队列、延迟提交和可见性优化；</li>
+<li>建立 <code>RendererAPI</code> 接口与 API 枚举；</li>
+<li>建立 <code>RenderCommand</code> 静态转发层；</li>
+<li>实现 <code>OpenGLRendererAPI</code>；</li>
+<li>用 <code>Renderer::Submit()</code> 绑定 VAO 并发出 Draw Call；</li>
+<li>把 Application 的清屏和绘制改成 Hazel 通用接口；</li>
+<li>修复首次重构时遗漏的 VAO 绑定；</li>
+<li>从 Application 中彻底移除 Glad；</li>
+<li>明确下一阶段的 Camera、Transform 和 Material。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Application / Game] --&gt; B[Renderer]
+    B --&gt; C[RenderCommand]
+    C --&gt; D[RendererAPI]
+    D --&gt; E[OpenGLRendererAPI]
+    E --&gt; F[OpenGL Driver]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_00_21.png" alt="重构前 Application 中只剩最后一条 glDrawElements" loading="lazy">
+  <p class="video-caption">📷 重构前 Application 中只剩最后一条 glDrawElements<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=21" target="_blank" rel="noopener">回到原视频 (00:00:21)</a></p>
+</div>
+
+<h2 id="1-draw-call">1. Draw Call 是真正的提交动作</h2>
+<p><em>(参考时间: 00:00:26)</em></p>
+<p>渲染前需要准备大量状态：</p>
+<ul>
+<li>绑定 Shader；</li>
+<li>绑定纹理和材质参数；</li>
+<li>绑定 Vertex Array；</li>
+<li>配置顶点属性和索引缓冲；</li>
+<li>上传 uniforms；</li>
+<li>决定要绘制多少索引。</li>
+</ul>
+<p>Draw Call 是最终把“已经准备好的状态”交给 GPU 执行的命令。GPU 按当前状态运行 Vertex Shader，完成图元装配、光栅化，再运行 Fragment Shader 得到像素颜色。</p>
+<p>在 OpenGL 中，本讲对应的调用是 <code>glDrawElements()</code>。DirectX 等后端也会有自己的等价提交命令。抽象层的目标，是让上层只说“绘制这个 Vertex Array”，而不关心底层函数名。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant App
+    participant Renderer
+    participant Backend
+    participant GPU
+    App-&gt;&gt;Renderer: Submit(vertexArray)
+    Renderer-&gt;&gt;Backend: DrawIndexed(vertexArray)
+    Backend-&gt;&gt;GPU: Draw command
+    GPU-&gt;&gt;GPU: Vertex / primitive / fragment
+</code></pre></div>
+
+<h2 id="2">2. 渲染一个物体至少需要什么</h2>
+<p><em>(参考时间: 00:03:25)</em></p>
+<p>把一个立方体画到 3D 世界中，需要两个层面的数据。</p>
+<h3 id="21">2.1 场景级数据</h3>
+<ul>
+<li>相机位置与朝向；</li>
+<li>View 矩阵；</li>
+<li>Projection 矩阵；</li>
+<li>灯光；</li>
+<li>环境贴图或环境光照；</li>
+<li>天空盒和全局渲染设置。</li>
+</ul>
+<p>这些信息在渲染一个场景中的所有对象时通常保持一致。</p>
+<h3 id="22">2.2 对象级数据</h3>
+<ul>
+<li>几何形状；</li>
+<li>Shader / Material；</li>
+<li>世界变换矩阵；</li>
+<li>法线、纹理坐标和骨骼数据；</li>
+<li>物件特有的渲染参数。</li>
+</ul>
+<p>当前 Hazel 只有 Vertex Array 和 Shader。相机、材质、灯光、环境贴图和变换系统都尚未实现，但本讲先把它们未来所在的位置确定下来。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Scene] --&gt; B[Camera]
+    A --&gt; C[Environment / Lights]
+    A --&gt; D[Objects]
+    D --&gt; E[Vertex Array]
+    D --&gt; F[Shader / Material]
+    D --&gt; G[Transform]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_03_26.png" alt="渲染场景由相机、环境与多个对象共同组成" loading="lazy">
+  <p class="video-caption">📷 渲染场景由相机、环境与多个对象共同组成<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=206" target="_blank" rel="noopener">回到原视频 (00:03:26)</a></p>
+</div>
+
+<h2 id="3-beginscene-submit-endscene">3. BeginScene / Submit / EndScene</h2>
+<p><em>(参考时间: 00:06:04)</em></p>
+<p>讲师把一次渲染组织成三个高层阶段：</p>
+<div class="highlight"><pre><span></span><code><span class="n">Renderer</span><span class="o">::</span><span class="n">BeginScene</span><span class="p">(</span><span class="n">sceneData</span><span class="p">);</span>
+
+<span class="n">shader</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="n">Renderer</span><span class="o">::</span><span class="n">Submit</span><span class="p">(</span><span class="n">vertexArray</span><span class="p">);</span>
+
+<span class="n">Renderer</span><span class="o">::</span><span class="n">EndScene</span><span class="p">();</span>
+</code></pre></div>
+
+<p><code>BeginScene()</code> 接收所有“整个场景共享”的参数。以后它会把相机矩阵、灯光和环境信息放入当前场景状态。</p>
+<p><code>Submit()</code> 接收每个待绘制对象。以后它还会接收变换矩阵和材质，并把这些对象级数据与当前场景组合起来。</p>
+<p><code>EndScene()</code> 表示场景提交结束。未来它可以触发命令队列刷新，让渲染线程执行已经收集的命令。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant App
+    participant R as Renderer
+    App-&gt;&gt;R: BeginScene(sceneData)
+    loop 每个对象
+        App-&gt;&gt;R: Submit(object, transform, material)
+    end
+    App-&gt;&gt;R: EndScene()
+    R-&gt;&gt;R: Flush command queue
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_08_30.png" alt="Renderer 将一帧拆成 BeginScene、对象提交与 EndScene" loading="lazy">
+  <p class="video-caption">📷 Renderer 将一帧拆成 BeginScene、对象提交与 EndScene<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=510" target="_blank" rel="noopener">回到原视频 (00:08:30)</a></p>
+</div>
+
+<h2 id="4">4. 当前采用立即提交</h2>
+<p><em>(参考时间: 00:09:02)</em></p>
+<p>成熟渲染器通常不会在 <code>Submit()</code> 中立即调用 GPU，而是把绘制请求写入 Render Command Queue：</p>
+<ol>
+<li>收集完整场景；</li>
+<li>执行视锥裁剪；</li>
+<li>合并材质相同或状态相同的对象；</li>
+<li>对绘制顺序排序；</li>
+<li>在线程安全的命令队列中统一执行；</li>
+<li>可以在独立渲染线程中消费。</li>
+</ol>
+<p>这些优化只有拿到整个场景后才有意义。如果每提交一个对象就立刻绘制，就无法提前知道后面的对象、灯光和材质分布。</p>
+<p>不过当前阶段没有相机、裁剪器、材质系统或 Render Graph。讲师选择先做最直接的立即模式：</p>
+<div class="highlight"><pre><span></span><code>Submit -&gt; Bind Vertex Array -&gt; DrawIndexed
+</code></pre></div>
+
+<p>未来再把中间实现替换为命令队列，同时保持上层 API 形态。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[当前立即提交] --&gt; B[Bind]
+    B --&gt; C[Draw]
+    D[未来延迟提交] --&gt; E[写入 Command Queue]
+    E --&gt; F[排序 / 合批 / 裁剪]
+    F --&gt; G[渲染线程执行]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_09_04.png" alt="当前先直接绘制，未来再引入命令队列和渲染线程" loading="lazy">
+  <p class="video-caption">📷 当前先直接绘制，未来再引入命令队列和渲染线程<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=544" target="_blank" rel="noopener">回到原视频 (00:09:04)</a></p>
+</div>
+
+<h2 id="5-run">5. 重构前的 Run 循环</h2>
+<p><em>(参考时间: 00:10:58)</em></p>
+<p>Application 原本直接完成：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glClearColor</span><span class="p">(</span><span class="mf">0.1f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1f</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="n">glClear</span><span class="p">(</span><span class="n">GL_COLOR_BUFFER_BIT</span><span class="p">);</span>
+
+<span class="n">m_BlueShader</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="n">m_SquareVA</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="n">glDrawElements</span><span class="p">(...);</span>
+
+<span class="n">m_Shader</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="n">m_VertexArray</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="n">glDrawElements</span><span class="p">(...);</span>
+</code></pre></div>
+
+<p>本讲希望把这段改写成：</p>
+<div class="highlight"><pre><span></span><code><span class="n">RenderCommand</span><span class="o">::</span><span class="n">SetClearColor</span><span class="p">({</span><span class="w"> </span><span class="mf">0.1f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1f</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">});</span>
+<span class="n">RenderCommand</span><span class="o">::</span><span class="n">Clear</span><span class="p">();</span>
+
+<span class="n">Renderer</span><span class="o">::</span><span class="n">BeginScene</span><span class="p">();</span>
+
+<span class="n">m_BlueShader</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="n">Renderer</span><span class="o">::</span><span class="n">Submit</span><span class="p">(</span><span class="n">m_SquareVA</span><span class="p">);</span>
+
+<span class="n">m_Shader</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="n">Renderer</span><span class="o">::</span><span class="n">Submit</span><span class="p">(</span><span class="n">m_VertexArray</span><span class="p">);</span>
+
+<span class="n">Renderer</span><span class="o">::</span><span class="n">EndScene</span><span class="p">();</span>
+</code></pre></div>
+
+<p>这一改动把“应用要画什么”与“OpenGL 怎样画”分开。</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[原来的 Application] --&gt; B[raw GL]
+    C[重构后的 Application] --&gt; D[RenderCommand]
+    C --&gt; E[Renderer]
+    D --&gt; F[RendererAPI]
+    E --&gt; D
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_11_09.png" alt="目标 API 让 Application 不再直接接触 OpenGL" loading="lazy">
+  <p class="video-caption">📷 目标 API 让 Application 不再直接接触 OpenGL<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=669" target="_blank" rel="noopener">回到原视频 (00:11:09)</a></p>
+</div>
+
+<h2 id="6-renderer-rendererapi">6. Renderer 与 RendererAPI 的职责差异</h2>
+<p><em>(参考时间: 00:14:09)</em></p>
+<p>Renderer 是高层对象：</p>
+<ul>
+<li>理解 Scene；</li>
+<li>接收几何与材质；</li>
+<li>绑定对象状态；</li>
+<li>组合场景级与对象级参数；</li>
+<li>未来负责队列、排序和批处理。</li>
+</ul>
+<p>清屏、Draw Call 这类具体操作位于 Renderer 之下。讲师把这一层称为 Render Command，把真正的图形 API 后端称为 Renderer API。</p>
+<p>命名也经过讨论。<code>RenderAPI</code> 虽然更短，但不够明确；<code>RendererAPI</code> 更清楚地表示“Renderer 所使用的图形 API”。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Renderer: 高层概念] --&gt; B[RenderCommand: 原子操作]
+    B --&gt; C[RendererAPI: 后端抽象]
+    C --&gt; D[OpenGL / DirectX / Vulkan]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_14_13.png" alt="Renderer、RenderCommand 与 RendererAPI 形成三层职责分离" loading="lazy">
+  <p class="video-caption">📷 Renderer、RenderCommand 与 RendererAPI 形成三层职责分离<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=853" target="_blank" rel="noopener">回到原视频 (00:14:13)</a></p>
+</div>
+
+<h2 id="7-rendererapi">7. RendererAPI 接口</h2>
+<p><em>(参考时间: 00:16:04)</em></p>
+<p>新增 <code>RendererAPI.h</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#pragma once</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;glm/glm.hpp&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"VertexArray.h"</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">Hazel</span><span class="w"> </span><span class="p">{</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">RendererAPI</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="k">enum</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">API</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">None</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">        </span><span class="n">OpenGL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">    </span><span class="p">};</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">SetClearColor</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">glm</span><span class="o">::</span><span class="n">vec4</span><span class="o">&amp;</span><span class="w"> </span><span class="n">color</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">Clear</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">DrawIndexed</span><span class="p">(</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexArray</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">vertexArray</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="n">API</span><span class="w"> </span><span class="nf">GetAPI</span><span class="p">()</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">s_API</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="n">API</span><span class="w"> </span><span class="n">s_API</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="p">}</span>
+</code></pre></div>
+
+<p>接口直接使用 GLM 的 <code>vec4</code> 表示颜色。数学库不是渲染后端，颜色参数也不会迫使接口暴露 OpenGL 类型。</p>
+<p><code>DrawIndexed()</code> 取名参考 DirectX，而不是照搬 OpenGL 的 <code>DrawElements()</code>。上层使用 Hazel 的 Index Buffer 概念，因此“绘制索引数据”是更中立的名称。</p>
+<div class="highlight"><pre><span></span><code>classDiagram
+    class RendererAPI {
+        &lt;&lt;interface&gt;&gt;
+        +SetClearColor(glm::vec4) = 0
+        +Clear() = 0
+        +DrawIndexed(VertexArray) = 0
+        +GetAPI() API
+    }
+    class OpenGLRendererAPI
+    RendererAPI &lt;|-- OpenGLRendererAPI
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_16_13.png" alt="RendererAPI 接口只暴露清屏和索引绘制等后端操作" loading="lazy">
+  <p class="video-caption">📷 RendererAPI 接口只暴露清屏和索引绘制等后端操作<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=973" target="_blank" rel="noopener">回到原视频 (00:16:13)</a></p>
+</div>
+
+<h2 id="8-api">8. API 枚举与当前后端</h2>
+<p><em>(参考时间: 00:18:21)</em></p>
+<p><code>RendererAPI.cpp</code> 暂时把当前后端设为 OpenGL：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"hzpch.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"RendererAPI.h"</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">Hazel</span><span class="w"> </span><span class="p">{</span>
+
+<span class="n">RendererAPI</span><span class="o">::</span><span class="n">API</span><span class="w"> </span><span class="n">RendererAPI</span><span class="o">::</span><span class="n">s_API</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">RendererAPI</span><span class="o">::</span><span class="n">API</span><span class="o">::</span><span class="n">OpenGL</span><span class="p">;</span>
+
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这里保存的是“当前选择哪一种后端”的枚举，不是后端对象本身。后端对象由更底层的 <code>RenderCommand</code> 持有。</p>
+<p>未来窗口和 Graphics Context 创建时可以决定实际 API，再实例化相应的 RendererAPI 实现。当前先固定 OpenGL。</p>
+<div class="highlight"><pre><span></span><code>stateDiagram-v2
+    [*] --&gt; SelectAPI
+    SelectAPI --&gt; CreateContext
+    CreateContext --&gt; CreateRendererAPI
+    CreateRendererAPI --&gt; IssueCommands
+    IssueCommands --&gt; FramePresented
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_18_21.png" alt="RendererAPI 保存当前图形 API 枚举，渲染线程通过具体对象执行命令" loading="lazy">
+  <p class="video-caption">📷 RendererAPI 保存当前图形 API 枚举，渲染线程通过具体对象执行命令<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=1101" target="_blank" rel="noopener">回到原视频 (00:18:21)</a></p>
+</div>
+
+<h2 id="9-rendercommand">9. RenderCommand 是静态转发层</h2>
+<p><em>(参考时间: 00:19:40)</em></p>
+<p><code>RenderCommand.h</code> 不包含渲染策略，只把调用转发给当前后端：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#pragma once</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"RendererAPI.h"</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">Hazel</span><span class="w"> </span><span class="p">{</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">RenderCommand</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">SetClearColor</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">glm</span><span class="o">::</span><span class="n">vec4</span><span class="o">&amp;</span><span class="w"> </span><span class="n">color</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">s_RendererAPI</span><span class="o">-&gt;</span><span class="n">SetClearColor</span><span class="p">(</span><span class="n">color</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">Clear</span><span class="p">()</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">s_RendererAPI</span><span class="o">-&gt;</span><span class="n">Clear</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">DrawIndexed</span><span class="p">(</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexArray</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">vertexArray</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">s_RendererAPI</span><span class="o">-&gt;</span><span class="n">DrawIndexed</span><span class="p">(</span><span class="n">vertexArray</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="n">RendererAPI</span><span class="o">*</span><span class="w"> </span><span class="n">s_RendererAPI</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="p">}</span>
+</code></pre></div>
+
+<p>每个函数只做一件事：</p>
+<ul>
+<li><code>SetClearColor()</code> 设置颜色；</li>
+<li><code>Clear()</code> 清屏；</li>
+<li><code>DrawIndexed()</code> 提交一次索引绘制。</li>
+</ul>
+<p>它们不绑定 Shader、不绑定 Vertex Array、不排序，也不处理材质。绑定等准备动作属于高层 Renderer。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant R as Renderer
+    participant RC as RenderCommand
+    participant API as OpenGLRendererAPI
+    R-&gt;&gt;RC: DrawIndexed(vertexArray)
+    RC-&gt;&gt;API: DrawIndexed(vertexArray)
+    API-&gt;&gt;API: glDrawElements
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_20_16.png" alt="RenderCommand 是静态、内联的原子命令包装层" loading="lazy">
+  <p class="video-caption">📷 RenderCommand 是静态、内联的原子命令包装层<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=1216" target="_blank" rel="noopener">回到原视频 (00:20:16)</a></p>
+</div>
+
+<h2 id="10-rendererapi">10. 创建当前 RendererAPI 实现</h2>
+<p><em>(参考时间: 00:24:43)</em></p>
+<p><code>RenderCommand.cpp</code> 创建 OpenGL 实现：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"hzpch.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"RenderCommand.h"</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"Platform/OpenGL/OpenGLRendererAPI.h"</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">Hazel</span><span class="w"> </span><span class="p">{</span>
+
+<span class="n">RendererAPI</span><span class="o">*</span><span class="w"> </span><span class="n">RenderCommand</span><span class="o">::</span><span class="n">s_RendererAPI</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="k">new</span><span class="w"> </span><span class="n">OpenGLRendererAPI</span><span class="p">;</span>
+
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这是一段临时实现：</p>
+<ul>
+<li>后端对象从应用启动存活到退出；</li>
+<li>当前没有动态工厂；</li>
+<li>没有在析构中删除，但对象没有成员，生命周期与进程相同；</li>
+<li>后续会由图形 Context 或渲染初始化逻辑选择实际实现。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[RenderCommand::s_RendererAPI] --&gt; B[new OpenGLRendererAPI]
+    B --&gt; C[SetClearColor]
+    B --&gt; D[Clear]
+    B --&gt; E[DrawIndexed]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_24_43.png" alt="RenderCommand 暂时固定持有一个 OpenGLRendererAPI 实例" loading="lazy">
+  <p class="video-caption">📷 RenderCommand 暂时固定持有一个 OpenGLRendererAPI 实例<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=1483" target="_blank" rel="noopener">回到原视频 (00:24:43)</a></p>
+</div>
+
+<h2 id="11-openglrendererapi">11. OpenGLRendererAPI 头文件</h2>
+<p><em>(参考时间: 00:25:51)</em></p>
+<p>平台实现继承通用接口：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#pragma once</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"Hazel/Renderer/RendererAPI.h"</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">Hazel</span><span class="w"> </span><span class="p">{</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">OpenGLRendererAPI</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">RendererAPI</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">SetClearColor</span><span class="p">(</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="n">glm</span><span class="o">::</span><span class="n">vec4</span><span class="o">&amp;</span><span class="w"> </span><span class="n">color</span><span class="p">)</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">Clear</span><span class="p">()</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">DrawIndexed</span><span class="p">(</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexArray</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">vertexArray</span><span class="p">)</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="p">}</span>
+</code></pre></div>
+
+<p>该文件位于 <code>Platform/OpenGL</code>。除这里和 OpenGL Buffer、Vertex Array 等平台文件外，上层不再需要包含 Glad。</p>
+<div class="highlight"><pre><span></span><code>classDiagram
+    class RendererAPI {
+        &lt;&lt;interface&gt;&gt;
+    }
+    class OpenGLRendererAPI {
+        +SetClearColor()
+        +Clear()
+        +DrawIndexed()
+    }
+    RendererAPI &lt;|-- OpenGLRendererAPI
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_25_51.png" alt="OpenGLRendererAPI 头文件只暴露通用 RendererAPI 覆盖" loading="lazy">
+  <p class="video-caption">📷 OpenGLRendererAPI 头文件只暴露通用 RendererAPI 覆盖<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=1551" target="_blank" rel="noopener">回到原视频 (00:25:51)</a></p>
+</div>
+
+<h2 id="12-drawindexed">12. 清屏与 DrawIndexed 实现</h2>
+<p><em>(参考时间: 00:27:13)</em></p>
+<p><code>OpenGLRendererAPI.cpp</code> 包含 Glad，并实现原始调用：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"hzpch.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"OpenGLRendererAPI.h"</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;glad/glad.h&gt;</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">Hazel</span><span class="w"> </span><span class="p">{</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">OpenGLRendererAPI::SetClearColor</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">glm</span><span class="o">::</span><span class="n">vec4</span><span class="o">&amp;</span><span class="w"> </span><span class="n">color</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glClearColor</span><span class="p">(</span><span class="n">color</span><span class="p">.</span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="n">color</span><span class="p">.</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">color</span><span class="p">.</span><span class="n">b</span><span class="p">,</span><span class="w"> </span><span class="n">color</span><span class="p">.</span><span class="n">a</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">OpenGLRendererAPI::Clear</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glClear</span><span class="p">(</span><span class="n">GL_COLOR_BUFFER_BIT</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">GL_DEPTH_BUFFER_BIT</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">OpenGLRendererAPI::DrawIndexed</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexArray</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">vertexArray</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glDrawElements</span><span class="p">(</span>
+<span class="w">        </span><span class="n">GL_TRIANGLES</span><span class="p">,</span>
+<span class="w">        </span><span class="n">vertexArray</span><span class="o">-&gt;</span><span class="n">GetIndexBuffer</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">GetCount</span><span class="p">(),</span>
+<span class="w">        </span><span class="n">GL_UNSIGNED_INT</span><span class="p">,</span>
+<span class="w">        </span><span class="nb">nullptr</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Clear 当前同时清除颜色和深度缓冲。未来可能需要传入 flags，只清除指定附件；Frame Buffer 也可能直接调用类似命令。</p>
+<p>DrawIndexed 当前固定绘制三角形、索引类型固定为 <code>uint32_t</code>。以后需要支持点、线、三角形条带和不同索引类型。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[RendererAPI command] --&gt; B{命令类型}
+    B -- Clear Color --&gt; C[glClearColor]
+    B -- Clear --&gt; D[glClear]
+    B -- Draw Indexed --&gt; E[glDrawElements]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_27_22.png" alt="OpenGLRendererAPI 把通用命令转换为 Glad/OpenGL 调用" loading="lazy">
+  <p class="video-caption">📷 OpenGLRendererAPI 把通用命令转换为 Glad/OpenGL 调用<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=1642" target="_blank" rel="noopener">回到原视频 (00:27:22)</a></p>
+</div>
+
+<h2 id="13-renderer">13. Renderer 高层接口</h2>
+<p><em>(参考时间: 00:21:12)</em></p>
+<p><code>Renderer.h</code> 只公开场景级操作：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#pragma once</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"RenderCommand.h"</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">Hazel</span><span class="w"> </span><span class="p">{</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Renderer</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">BeginScene</span><span class="p">();</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">EndScene</span><span class="p">();</span>
+
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">Submit</span><span class="p">(</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexArray</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">vertexArray</span><span class="p">);</span>
+
+<span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="n">RendererAPI</span><span class="o">::</span><span class="n">API</span><span class="w"> </span><span class="nf">GetAPI</span><span class="p">()</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">RendererAPI</span><span class="o">::</span><span class="n">GetAPI</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">};</span>
+
+<span class="p">}</span>
+</code></pre></div>
+
+<p><code>GetAPI()</code> 仍然有用：引擎调试面板或平台特定代码可能需要知道当前使用的是 OpenGL 还是 DirectX。它只是查询枚举，不会暴露底层 API 对象。</p>
+<div class="highlight"><pre><span></span><code>classDiagram
+    class Renderer {
+        +BeginScene()
+        +EndScene()
+        +Submit(shared_ptr~VertexArray~)
+        +GetAPI() RendererAPI::API
+    }
+    Renderer ..&gt; RenderCommand
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_21_12.png" alt="Renderer 只保留场景、提交和 API 查询等高层能力" loading="lazy">
+  <p class="video-caption">📷 Renderer 只保留场景、提交和 API 查询等高层能力<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=1272" target="_blank" rel="noopener">回到原视频 (00:21:12)</a></p>
+</div>
+
+<h2 id="14-submit-vertex-array">14. Submit 必须绑定 Vertex Array</h2>
+<p><em>(参考时间: 00:32:17)</em></p>
+<p>最初 <code>Renderer::Submit()</code> 直接调用 DrawIndexed，忘记绑定 VAO，导致画面上没有预期对象。</p>
+<p>正确实现是：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">Renderer::Submit</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexArray</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">vertexArray</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">vertexArray</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="w">    </span><span class="n">RenderCommand</span><span class="o">::</span><span class="n">DrawIndexed</span><span class="p">(</span><span class="n">vertexArray</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>这里体现了职责边界：</p>
+<ul>
+<li>Renderer 负责准备绘制所需的绑定状态；</li>
+<li>RenderCommand 只发出单个原子操作；</li>
+<li>RenderCommand 不应该偷偷绑定 VAO，否则名字叫 DrawIndexed 的命令实际做了两件事。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant R as Renderer::Submit
+    participant VA as VertexArray
+    participant RC as RenderCommand
+    participant GL as OpenGLRendererAPI
+    R-&gt;&gt;VA: Bind()
+    R-&gt;&gt;RC: DrawIndexed(VA)
+    RC-&gt;&gt;GL: DrawIndexed(VA)
+    GL-&gt;&gt;GL: glDrawElements
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_32_19.png" alt="Submit 负责绑定 VAO，RenderCommand 只执行绘制命令" loading="lazy">
+  <p class="video-caption">📷 Submit 负责绑定 VAO，RenderCommand 只执行绘制命令<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=1939" target="_blank" rel="noopener">回到原视频 (00:32:19)</a></p>
+</div>
+
+<h2 id="15-beginscene-endscene">15. BeginScene 与 EndScene 暂时为空</h2>
+<p><em>(参考时间: 00:22:26)</em></p>
+<p><code>Renderer.cpp</code> 当前实现：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">Renderer::BeginScene</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">Renderer::EndScene</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">Renderer::Submit</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexArray</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">vertexArray</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">vertexArray</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="w">    </span><span class="n">RenderCommand</span><span class="o">::</span><span class="n">DrawIndexed</span><span class="p">(</span><span class="n">vertexArray</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>BeginScene 未来会接收相机和环境参数，保存当前场景状态，并确保后续材质得到正确的 Shader uniforms。</p>
+<p>EndScene 未来会结束命令收集，刷新命令队列，或者通知渲染线程执行本帧。</p>
+<p>现在留空是明确的阶段性选择，而不是遗漏。它们为后续架构保留了稳定调用点。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[BeginScene] --&gt; B[保存 Camera / Environment]
+    B --&gt; C[Submit objects]
+    C --&gt; D[绑定 VAO]
+    D --&gt; E[写入或执行 Draw]
+    E --&gt; F[EndScene]
+    F --&gt; G[Flush future queue]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_22_26.png" alt="BeginScene 与 EndScene 当前为空，但承担未来场景状态边界" loading="lazy">
+  <p class="video-caption">📷 BeginScene 与 EndScene 当前为空，但承担未来场景状态边界<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=1346" target="_blank" rel="noopener">回到原视频 (00:22:26)</a></p>
+</div>
+
+<h2 id="16-application-renderer">16. Application 改用 Renderer 流程</h2>
+<p><em>(参考时间: 00:30:43)</em></p>
+<p>Application 删除 Glad 和裸绘制代码，引入：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"Hazel/Renderer/Renderer.h"</span>
+</code></pre></div>
+
+<p>Run 循环变成：</p>
+<div class="highlight"><pre><span></span><code><span class="n">RenderCommand</span><span class="o">::</span><span class="n">SetClearColor</span><span class="p">({</span><span class="w"> </span><span class="mf">0.1f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1f</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">});</span>
+<span class="n">RenderCommand</span><span class="o">::</span><span class="n">Clear</span><span class="p">();</span>
+
+<span class="n">Renderer</span><span class="o">::</span><span class="n">BeginScene</span><span class="p">();</span>
+
+<span class="n">m_BlueShader</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="n">Renderer</span><span class="o">::</span><span class="n">Submit</span><span class="p">(</span><span class="n">m_SquareVA</span><span class="p">);</span>
+
+<span class="n">m_Shader</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="n">Renderer</span><span class="o">::</span><span class="n">Submit</span><span class="p">(</span><span class="n">m_VertexArray</span><span class="p">);</span>
+
+<span class="n">Renderer</span><span class="o">::</span><span class="n">EndScene</span><span class="p">();</span>
+</code></pre></div>
+
+<p>Shader 仍然由应用绑定，因为 Material 系统还没有建立。未来 Mesh 会持有 Material，Material 会选择 Shader 和 uniforms，Renderer 再统一处理这些对象级状态。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant App
+    participant RC as RenderCommand
+    participant R as Renderer
+    participant S as Shader
+    App-&gt;&gt;RC: SetClearColor + Clear
+    App-&gt;&gt;R: BeginScene
+    App-&gt;&gt;S: Bind BlueShader
+    App-&gt;&gt;R: Submit SquareVA
+    App-&gt;&gt;S: Bind Triangle Shader
+    App-&gt;&gt;R: Submit TriangleVA
+    App-&gt;&gt;R: EndScene
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_30_43.png" alt="Application 通过 RenderCommand 清屏，并通过 Renderer 提交两个 VAO" loading="lazy">
+  <p class="video-caption">📷 Application 通过 RenderCommand 清屏，并通过 Renderer 提交两个 VAO<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=1843" target="_blank" rel="noopener">回到原视频 (00:30:43)</a></p>
+</div>
+
+<h2 id="17-glad">17. 结果保持一致且不再依赖 Glad</h2>
+<p><em>(参考时间: 00:33:06)</em></p>
+<p>修复 VAO 绑定后，运行结果与上一讲完全相同：蓝色方块和渐变三角形正常显示。</p>
+<p>随后讲师从 Application 中移除：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;glad/glad.h&gt;</span>
+</code></pre></div>
+
+<p>只编译 Hazel 渲染库就能通过。Application 不再看到：</p>
+<ul>
+<li><code>glClearColor</code></li>
+<li><code>glClear</code></li>
+<li><code>glBindVertexArray</code></li>
+<li><code>glDrawElements</code></li>
+<li><code>GL_TRIANGLES</code></li>
+<li><code>GL_UNSIGNED_INT</code></li>
+</ul>
+<p>所有 OpenGL 细节都被限制在平台实现中。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[Application] --&gt; B[Renderer / RenderCommand]
+    B --&gt; C[RendererAPI]
+    C --&gt; D[OpenGLRendererAPI]
+    D --&gt; E[Glad]
+    A -. 无直接依赖 .-&gt; E
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_34_05.png" alt="Application 完全移除 Glad 后仍能绘制相同画面" loading="lazy">
+  <p class="video-caption">📷 Application 完全移除 Glad 后仍能绘制相同画面<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=2045" target="_blank" rel="noopener">回到原视频 (00:34:05)</a></p>
+</div>
+
+<h2 id="18-openglrendererapi">18. OpenGLRendererAPI 的边界</h2>
+<p><em>(参考时间: 00:28:08)</em></p>
+<p>当前 OpenGL 后端刻意保持简单：</p>
+<ul>
+<li>清屏固定同时清除颜色和深度；</li>
+<li>DrawIndexed 固定绘制 <code>GL_TRIANGLES</code>；</li>
+<li>索引类型固定为 <code>GL_UNSIGNED_INT</code>；</li>
+<li>不设置 primitive mode；</li>
+<li>不处理 viewport；</li>
+<li>不处理混合、深度测试和面剔除；</li>
+<li>不管理 Frame Buffer。</li>
+</ul>
+<p>这些限制不是长期接口，而是当前渲染器还没有处理对应状态。让命令保持最小化，可以让后续扩展点时更清楚每一次 API 增长是为了哪种能力。</p>
+<div class="highlight"><pre><span></span><code>mindmap
+  root((OpenGLRendererAPI))
+    Clear
+      Color
+      Depth
+      Future flags
+    DrawIndexed
+      Triangles
+      uint32 indices
+      Future primitive type
+    Future state
+      Blend
+      Depth test
+      Cull face
+      Viewport
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_28_08.png" alt="OpenGLRendererAPI 当前只实现最小 Clear 与 DrawIndexed 命令" loading="lazy">
+  <p class="video-caption">📷 OpenGLRendererAPI 当前只实现最小 Clear 与 DrawIndexed 命令<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=1688" target="_blank" rel="noopener">回到原视频 (00:28:08)</a></p>
+</div>
+
+<h2 id="19">19. 命令队列与多线程渲染</h2>
+<p><em>(参考时间: 00:35:50)</em></p>
+<p>真正的 Render Command Queue 会把命令保存下来，由渲染线程在合适的时间执行。好处包括：</p>
+<ul>
+<li>将场景提交与 GPU 提交解耦；</li>
+<li>在完整场景上执行视锥裁剪；</li>
+<li>按材质和渲染状态合批；</li>
+<li>调整透明物体与不透明物体的顺序；</li>
+<li>构建跨线程安全的任务结构；</li>
+<li>降低主线程阻塞。</li>
+</ul>
+<p>当前还没有真实 3D 场景，多线程和队列不会成为瓶颈。过早引入只会让代码更复杂。现阶段先把高层 API 形态固定下来，未来替换内部执行机制。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[Game Thread] --&gt; B[Submit object]
+    B --&gt; C[Command Queue]
+    C --&gt; D[Sort / Cull / Batch]
+    D --&gt; E[Render Thread]
+    E --&gt; F[GPU Commands]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_35_50.png" alt="未来命令队列负责延迟提交、排序、裁剪与跨线程执行" loading="lazy">
+  <p class="video-caption">📷 未来命令队列负责延迟提交、排序、裁剪与跨线程执行<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=2150" target="_blank" rel="noopener">回到原视频 (00:35:50)</a></p>
+</div>
+
+<h2 id="20-cameratransform-material">20. 下一阶段：Camera、Transform 与 Material</h2>
+<p><em>(参考时间: 00:34:41)</em></p>
+<p>渲染器已经能发出 Draw Call，但还缺少 3D 场景的关键输入：</p>
+<ul>
+<li>Camera：提供 View 与 Projection；</li>
+<li>Transform：把对象放到世界中的位置、旋转和缩放到 Shader；</li>
+<li>Material：选择 Shader 并上传对象级参数；</li>
+<li>Mesh：把 Vertex Array、Material 与 Transform 组织在一起；</li>
+<li>Environment：灯光与环境贴图；</li>
+<li>Renderer scene state：保存 BeginScene 传入的共享参数。</li>
+</ul>
+<p>讲师计划先引入相机，让场景可以在 3D 空间中观察；随后处理变换矩阵和材质，使对象能以不同位置、姿态和外观提交到 Renderer。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Camera] --&gt; E[Scene State]
+    B[Environment] --&gt; E
+    C[Mesh] --&gt; D[Material]
+    C --&gt; F[VertexArray]
+    C --&gt; G[Transform]
+    E --&gt; H[Renderer]
+    D --&gt; H
+    F --&gt; H
+    G --&gt; H
+    H --&gt; I[RenderCommand]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_34_41.png" alt="下一步补齐 Camera、Transform、Material 与 Mesh" loading="lazy">
+  <p class="video-caption">📷 下一步补齐 Camera、Transform、Material 与 Mesh<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33&t=2081" target="_blank" rel="noopener">回到原视频 (00:34:41)</a></p>
+</div>
+
+<h2 id="21_1">21. 本节结论</h2>
+<p>本讲完成了 Hazel 渲染架构的第一个稳定分层：</p>
+<ul>
+<li>Draw Call 从 Application 移入 OpenGL 后端；</li>
+<li>明确场景级数据与对象级数据的区别；</li>
+<li>建立 <code>Renderer::BeginScene()</code>、<code>Submit()</code>、<code>EndScene()</code>；</li>
+<li>建立 <code>RendererAPI</code> 接口与 API 枚举；</li>
+<li>建立 <code>RenderCommand</code> 静态命令转发层；</li>
+<li>实现 <code>OpenGLRendererAPI</code>；</li>
+<li>用 OpenGLRendererAPI 封装清屏和 <code>glDrawElements</code>；</li>
+<li>Submit 负责绑定 VAO，命令本身保持原子化；</li>
+<li>Application 改用通用 Renderer 流程；</li>
+<li>修复遗漏 VAO 绑定导致的不显示问题；</li>
+<li>从 Application 中移除 Glad；</li>
+<li>保持画面与上一讲完全一致；</li>
+<li>明确未来的命令队列、相机、材质与变换方向。</li>
+</ul>
+<p>这版 Renderer 仍然简单，但职责边界已经清晰：Renderer 决定“怎样准备一次绘制”，RenderCommand 表达“要执行什么原子操作”，RendererAPI 决定“当前平台怎样实际完成”。</p>
+<h2 id="_2">附：参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=33">Bilibili 精译视频：033 - 渲染流程与提交</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/tree/dc9e382">本期对应代码提交 <code>dc9e382</code></a></li>
+<li><a href="https://www.khronos.org/opengl/wiki/Rendering_Pipeline_Overview">OpenGL Wiki：Rendering Pipeline Overview</a></li>
+<li><a href="https://www.khronos.org/opengl/wiki/Vertex_Specification">OpenGL Wiki：Vertex Specification</a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>
