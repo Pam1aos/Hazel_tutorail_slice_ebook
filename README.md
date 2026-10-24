@@ -76,6 +76,10 @@
   - [Markdown 版本](<Hazel Game Engine/031 - Vertex Buffer Layouts/book.md>)
   - 视频来源：[Bilibili 精译版第 31 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=31)
   - 主题：`ShaderDataType`、`BufferElement`、`BufferLayout`、自动偏移与步长、交错顶点属性和顶点颜色插值
+- [032 - 顶点数组](<Hazel Game Engine/032 - Vertex Arrays/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/032 - Vertex Arrays/book.md>)
+  - 视频来源：[Bilibili 精译版第 32 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=32)
+  - 主题：`VertexArray` 抽象、共享资源生命周期、VAO/EBO 绑定状态、属性配置、第二个 VAO 与索引缓冲调试
 
 ## 南京大学操作系统原理 2026
 

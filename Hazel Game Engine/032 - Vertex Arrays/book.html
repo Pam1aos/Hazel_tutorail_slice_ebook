@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hazel 游戏引擎笔记 032：顶点数组</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── 基础重置 ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            color-scheme: light;
+            --bg-primary: #f7f7f8;
+            --bg-secondary: #ffffff;
+            --bg-card: #eef0f3;
+            --bg-code: #f2f3f5;
+            --text-primary: #1f2328;
+            --text-secondary: #57606a;
+            --text-muted: #6e7781;
+            --accent: #2563eb;
+            --accent-glow: rgba(37, 99, 235, 0.08);
+            --border: #d9dce1;
+            --border-subtle: #e7e9ec;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Serif SC', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.8;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 文章容器 ── */
+        .book-content {
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 60px 32px 120px;
+        }
+
+        /* ── 标题 ── */
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 56px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent);
+            margin: 36px 0 12px;
+        }
+
+        /* ── 段落与文字 ── */
+        p {
+            margin: 0 0 16px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-bottom-color: var(--accent);
+        }
+
+        /* ── 引用 ── */
+        blockquote {
+            margin: 24px 0;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+        }
+        blockquote p { margin: 0; }
+
+        /* ── 列表 ── */
+        ul, ol {
+            margin: 12px 0 20px 24px;
+            color: var(--text-primary);
+        }
+        li {
+            margin: 6px 0;
+        }
+
+        /* ── 分割线 ── */
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 48px 0;
+        }
+
+        /* ── 表格 ── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        thead {
+            background: var(--bg-card);
+        }
+        th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            color: var(--accent);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+        tbody tr:hover {
+            background: var(--bg-card);
+        }
+
+        /* ── 代码 ── */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            color: #6d28d9;
+        }
+
+        pre {
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: var(--bg-code);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        /* ── 视频嵌入卡片 ── */
+        .video-card {
+            margin: 32px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            overflow: hidden;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .video-caption {
+            padding: 12px 16px;
+            font-size: 0.88em;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .video-caption a {
+            color: var(--accent);
+        }
+
+        .video-card.fallback {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* ── Lightbox：截图点击放大 ── */
+        .screenshot-card img { cursor: zoom-in; transition: opacity 0.15s; }
+        .screenshot-card img:hover { opacity: 0.9; }
+        .lightbox {
+            position: fixed; inset: 0; z-index: 999;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(5, 5, 8, 0.92); backdrop-filter: blur(4px);
+            cursor: zoom-out; padding: 24px;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img {
+            max-width: 96vw; max-height: 90vh;
+            border-radius: 8px; box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+        }
+        .lightbox-caption {
+            position: absolute; bottom: 14px; left: 0; right: 0;
+            text-align: center; color: #f3f4f6; font-size: 0.85em;
+        }
+
+        /* ── 顶部信息栏 ── */
+        .book-content > blockquote:first-of-type {
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            border-radius: var(--radius);
+            margin-bottom: 32px;
+        }
+
+        /* ── 图表居中 ── */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 32px 0;
+            overflow-x: auto;
+        }
+
+        /* ── 滚动条 ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ── 响应式 ── */
+        @media (max-width: 640px) {
+            .book-content { padding: 32px 16px 80px; }
+            h1 { font-size: 1.7em; }
+            h2 { font-size: 1.3em; }
+            pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+            code { overflow-wrap: anywhere; word-break: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <article class="book-content">
+        <h1 id="hazel-032">Hazel 游戏引擎笔记 032：顶点数组</h1>
+<blockquote>
+<p>本节来源：<a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32">The Cherno 游戏引擎系列第 32 讲“顶点数组”</a>，时长约 42 分 41 秒。<br />
+原课程与 Hazel 代码作者：The Cherno。代码参考提交：<a href="https://github.com/TheCherno/Hazel/tree/0d292a3"><code>0d292a3</code></a>。<br />
+本文由视频字幕重构、翻译并整理，不是官方教材；术语和代码以原视频及同期 Hazel 仓库为准。</p>
+</blockquote>
+<h2 id="_1">本节目标</h2>
+<p>上一讲已经建立了 <code>BufferLayout</code>，但顶点属性配置仍写在 <code>Application.cpp</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glGenVertexArrays</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">m_VertexArray</span><span class="p">);</span>
+<span class="n">glBindVertexArray</span><span class="p">(</span><span class="n">m_VertexArray</span><span class="p">);</span>
+
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">element</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">layout</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glEnableVertexAttribArray</span><span class="p">(</span><span class="n">index</span><span class="p">);</span>
+<span class="w">    </span><span class="n">glVertexAttribPointer</span><span class="p">(</span>
+<span class="w">        </span><span class="n">index</span><span class="p">,</span>
+<span class="w">        </span><span class="n">element</span><span class="p">.</span><span class="n">GetComponentCount</span><span class="p">(),</span>
+<span class="w">        </span><span class="n">ShaderDataTypeToOpenGLBaseType</span><span class="p">(</span><span class="n">element</span><span class="p">.</span><span class="n">Type</span><span class="p">),</span>
+<span class="w">        </span><span class="n">element</span><span class="p">.</span><span class="n">Normalized</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">GL_TRUE</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">GL_FALSE</span><span class="p">,</span>
+<span class="w">        </span><span class="n">layout</span><span class="p">.</span><span class="n">GetStride</span><span class="p">(),</span>
+<span class="w">        </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="p">)</span><span class="n">element</span><span class="p">.</span><span class="n">Offset</span><span class="p">);</span>
+<span class="w">    </span><span class="n">index</span><span class="o">++</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>本讲把这些 OpenGL 调用封装进通用 <code>VertexArray</code>，并让应用层只负责：</p>
+<ol>
+<li>创建 Vertex Array；</li>
+<li>创建带布局的 Vertex Buffer；</li>
+<li>把 Vertex Buffer 加入 Vertex Array；</li>
+<li>设置 Index Buffer；</li>
+<li>渲染时绑定 Vertex Array 并发出 Draw Call。</li>
+</ol>
+<p>本讲完成的内容：</p>
+<ul>
+<li>解释 Vertex Array、Vertex Buffer 与 Index Buffer 的关系；</li>
+<li>设计通用 <code>VertexArray</code> 接口；</li>
+<li>使用 <code>RendererAPI</code> 工厂创建 OpenGL 实现；</li>
+<li>把属性配置移入 <code>OpenGLVertexArray::AddVertexBuffer()</code>；</li>
+<li>用共享指针管理渲染资源生命周期；</li>
+<li>加入“顶点缓冲必须已有布局”的断言；</li>
+<li>把 <code>Application</code> 改为只使用通用接口；</li>
+<li>创建第二个 Vertex Array 绘制方块；</li>
+<li>为方块准备单独 Shader、顶点和索引；</li>
+<li>定位方块只画出三个顶点的问题；</li>
+<li>清理多余的 Vertex Buffer / Index Buffer 成员；</li>
+<li>为下一讲的 Draw Call 抽象留下边界。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Application] --&gt; B[VertexArray]
+    B --&gt; C[VertexBuffer]
+    B --&gt; D[IndexBuffer]
+    C --&gt; E[BufferLayout]
+    E --&gt; F[glVertexAttribPointer]
+    B --&gt; G[glBindVertexArray]
+    D --&gt; H[DrawIndexed Count]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_07_05.png" alt="上一讲仍在 Application 中手写 VAO 和属性配置" loading="lazy">
+  <p class="video-caption">📷 上一讲仍在 Application 中手写 VAO 和属性配置<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=425" target="_blank" rel="noopener">回到原视频 (00:07:05)</a></p>
+</div>
+
+<h2 id="1-vertex-array">1. Vertex Array 只保存状态</h2>
+<p><em>(参考时间: 00:00:34)</em></p>
+<p>顶点数据保存在 Vertex Buffer，索引数据保存在 Index Buffer。Vertex Array 本身不保存顶点数组，它保存的是“如何读取这些缓冲”的状态。</p>
+<p>它主要关联：</p>
+<ul>
+<li>一个或多个 Vertex Buffer；</li>
+<li>每个 Buffer 的布局、stride 和 offset；</li>
+<li>每个属性的 location、类型、分量数和归一化状态；</li>
+<li>一个 Index Buffer；</li>
+<li>OpenGL 在 Draw Call 时需要的绑定状态。</li>
+</ul>
+<p>讲师把 Vertex Array 描述为一种“状态容器”。它是 OpenGL 特有的设计，初看并不直观，但抽象后正好可以表示“一组资源如何组成可绘制对象”。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Vertex Array Object] --&gt; B[Attribute State]
+    A --&gt; C[Associated Vertex Buffers]
+    A --&gt; D[Associated Index Buffer]
+    B --&gt; E[Layout / Stride / Offset]
+    C --&gt; F[Vertex Data]
+    D --&gt; G[Index Data]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_01_50.png" alt="Vertex Array 关联缓冲和读取状态，本身不保存顶点数据" loading="lazy">
+  <p class="video-caption">📷 Vertex Array 关联缓冲和读取状态，本身不保存顶点数据<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=110" target="_blank" rel="noopener">回到原视频 (00:01:50)</a></p>
+</div>
+
+<h2 id="2">2. 引用不等于拥有数据</h2>
+<p><em>(参考时间: 00:01:41)</em></p>
+<p>从 OpenGL 的底层语义看，Vertex Array 关联 Buffer ID，并不复制 Vertex Buffer 或 Index Buffer 的 GPU 内存。</p>
+<p>如果把同一个 Vertex Buffer 绑定到另一个 Vertex Array，底层使用的仍是同一块数据。修改 Vertex Buffer 内容时，所有引用它的 Vertex Array 都会看到变化。</p>
+<p>这带来一个 C++ 层的责任：通用包装对象必须保证被引用的资源继续存活。本讲使用 <code>std::shared_ptr</code> 保存引用，让 Vertex Array 在 C++ 生命周期上持有对应资源。</p>
+<p>这里有两个层次：</p>
+<ul>
+<li><strong>OpenGL 对象关系</strong>：VAO 记录 Buffer 的关联状态；</li>
+<li><strong>C++ 资源管理</strong>：Hazel 的 <code>VertexArray</code> 持有 <code>shared_ptr</code>，防止资源提前销毁。</li>
+</ul>
+<div class="highlight"><pre><span></span><code>classDiagram
+    class VertexArray {
+        +Bind() const
+        +Unbind() const
+        +AddVertexBuffer(shared_ptr)
+        +SetIndexBuffer(shared_ptr)
+        +GetVertexBuffers()
+        +GetIndexBuffer()
+    }
+    class VertexBuffer
+    class IndexBuffer
+    VertexArray o-- VertexBuffer
+    VertexArray o-- IndexBuffer
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_02_55.png" alt="顶点数组持有资源引用，但底层数据仍属于 Buffer" loading="lazy">
+  <p class="video-caption">📷 顶点数组持有资源引用，但底层数据仍属于 Buffer<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=175" target="_blank" rel="noopener">回到原视频 (00:02:55)</a></p>
+</div>
+
+<h2 id="3-vertex-buffer-index-buffer">3. 多个 Vertex Buffer 与一个 Index Buffer</h2>
+<p><em>(参考时间: 00:02:52)</em></p>
+<p>一个 Vertex Array 可以关联多个 Vertex Buffer。例如：</p>
+<ul>
+<li>一个 Buffer 保存位置；</li>
+<li>一个 Buffer 保存法线；</li>
+<li>一个 Buffer 保存骨骼权重；</li>
+<li>一个 Buffer 保存纹理坐标。</li>
+</ul>
+<p>添加多个 Buffer 时，每个 Buffer 都必须在 Vertex Array 绑定期间配置自己的布局。属性 location 仍要按 Shader 期望的顺序递增。</p>
+<p>Index Buffer 则通常只有一个。讲师表示自己几乎没有见过在同一个绘制对象中使用多个 Index Buffer 的情况，因此接口采用 <code>SetIndexBuffer()</code>，而不是 <code>AddIndexBuffer()</code>。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[绑定 Vertex Array] --&gt; B[绑定 Vertex Buffer 1]
+    B --&gt; C[配置位置属性]
+    C --&gt; D[绑定 Vertex Buffer 2]
+    D --&gt; E[配置法线属性]
+    E --&gt; F[绑定唯一 Index Buffer]
+    F --&gt; G[提交 Draw Call]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_03_55.png" alt="多个 Vertex Buffer 可以共享一个 VAO，但通常只有一个 Index Buffer" loading="lazy">
+  <p class="video-caption">📷 多个 Vertex Buffer 可以共享一个 VAO，但通常只有一个 Index Buffer<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=235" target="_blank" rel="noopener">回到原视频 (00:03:55)</a></p>
+</div>
+
+<h2 id="4-directx-vao">4. DirectX 没有等价的 VAO</h2>
+<p><em>(参考时间: 00:05:02)</em></p>
+<p>DirectX 没有与 OpenGL Vertex Array 完全对应的对象。OpenGL 将“资源关联与属性状态”集中放在 VAO 中，而 DirectX 的输入布局与资源绑定流程不同。</p>
+<p>讲师明确当前阶段优先把 OpenGL 引擎完整做起来。若过早为 DirectX 重新设计整套渲染架构，会拖慢已有产品的形成。</p>
+<p>一个常见的临时兼容方式是：在通用 API 中保留 <code>VertexArray::Create()</code>，但 DirectX 实现可以暂时什么都不做。这样上层代码结构保持稳定，后续再根据 DirectX 的真实需求重构。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[通用 VertexArray API] --&gt; B[OpenGL 实现]
+    A --&gt; C[DirectX 临时空实现]
+    B --&gt; D[真实 VAO 状态]
+    C --&gt; E[不创建对应对象]
+    D --&gt; F[同一上层调用形态]
+    E --&gt; F
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_05_02.png" alt="DirectX 没有 VAO 时可以在通用接口下提供空实现" loading="lazy">
+  <p class="video-caption">📷 DirectX 没有 VAO 时可以在通用接口下提供空实现<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=302" target="_blank" rel="noopener">回到原视频 (00:05:02)</a></p>
+</div>
+
+<h2 id="5-vertexarray">5. VertexArray 通用接口</h2>
+<p><em>(参考时间: 00:07:05)</em></p>
+<p>新建 <code>VertexArray.h</code>，接口只依赖通用的 Vertex Buffer 与 Index Buffer：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#pragma once</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;memory&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"Hazel/Renderer/Buffer.h"</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">Hazel</span><span class="w"> </span><span class="p">{</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">VertexArray</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="o">~</span><span class="n">VertexArray</span><span class="p">()</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">Bind</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">Unbind</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">AddVertexBuffer</span><span class="p">(</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexBuffer</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">vertexBuffer</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">SetIndexBuffer</span><span class="p">(</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">IndexBuffer</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">indexBuffer</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexBuffer</span><span class="o">&gt;&gt;&amp;</span>
+<span class="w">    </span><span class="n">GetVertexBuffers</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">IndexBuffer</span><span class="o">&gt;&amp;</span>
+<span class="w">    </span><span class="n">GetIndexBuffer</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="n">VertexArray</span><span class="o">*</span><span class="w"> </span><span class="nf">Create</span><span class="p">();</span>
+<span class="p">};</span>
+
+<span class="p">}</span>
+</code></pre></div>
+
+<p>接口没有 <code>SetLayout()</code>。布局属于 Vertex Buffer，加入 Vertex Array 时由实现读取布局并配置属性。</p>
+<p><code>Create()</code> 不需要参数，因为 VAO 本身只是状态容器；真正的数据在后续通过 <code>AddVertexBuffer()</code> 和 <code>SetIndexBuffer()</code> 接入。</p>
+<div class="highlight"><pre><span></span><code>classDiagram
+    class VertexArray {
+        &lt;&lt;interface&gt;&gt;
+        +Bind() const
+        +Unbind() const
+        +AddVertexBuffer(shared_ptr~VertexBuffer~)
+        +SetIndexBuffer(shared_ptr~IndexBuffer~)
+        +GetVertexBuffers() const
+        +GetIndexBuffer() const
+        +Create()$
+    }
+    class OpenGLVertexArray
+    VertexArray &lt;|-- OpenGLVertexArray
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_10_13.png" alt="通用 VertexArray 接口以共享指针接收缓冲资源" loading="lazy">
+  <p class="video-caption">📷 通用 VertexArray 接口以共享指针接收缓冲资源<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=613" target="_blank" rel="noopener">回到原视频 (00:10:13)</a></p>
+</div>
+
+<h2 id="6-shared_ptr">6. 为什么使用 shared_ptr</h2>
+<p><em>(参考时间: 00:08:45)</em></p>
+<p>Hazel 的资源系统方向是让 Vertex Buffer、Index Buffer、Texture、Shader 等资源被引用计数管理。</p>
+<p><code>shared_ptr</code> 允许一个 Buffer 同时被：</p>
+<ul>
+<li>Vertex Array；</li>
+<li>网格对象；</li>
+<li>资源缓存；</li>
+<li>临时加载代码；</li>
+</ul>
+<p>共同引用。最后一个持有者销毁时，底层资源才会释放。</p>
+<p>讲师也提到，如果未来极致关注性能，可以实现侵入式引用计数。但当前阶段，<code>shared_ptr</code> 已经能提供清晰的所有权语义，控制块本身的成本不是首要瓶颈。</p>
+<p>当前工厂仍返回裸指针，因为 <code>make_shared&lt;VertexBuffer&gt;</code> 会尝试直接构造抽象基类，而工厂内部实际构造的是派生类。应用先创建共享指针，再使用 <code>reset()</code> 接管工厂结果：</p>
+<div class="highlight"><pre><span></span><code><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexBuffer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">vertexBuffer</span><span class="p">;</span>
+<span class="n">vertexBuffer</span><span class="p">.</span><span class="n">reset</span><span class="p">(</span>
+<span class="w">    </span><span class="n">VertexBuffer</span><span class="o">::</span><span class="n">Create</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">vertices</span><span class="p">)));</span>
+</code></pre></div>
+
+<p>未来可能统一返回 Hazel 的 <code>Ref&lt;T&gt;</code> 或 <code>Scope&lt;T&gt;</code>，但这一讲先沿用现有工厂形态。</p>
+<div class="highlight"><pre><span></span><code>flowchart LR
+    A[VertexArray shared_ptr] --&gt; R[Buffer 资源]
+    B[Mesh / Cache shared_ptr] --&gt; R
+    C[Local loader shared_ptr] --&gt; R
+    R --&gt; D[最后一个引用销毁时释放]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_08_45.png" alt="共享指针让多个上层对象安全引用同一个渲染资源" loading="lazy">
+  <p class="video-caption">📷 共享指针让多个上层对象安全引用同一个渲染资源<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=525" target="_blank" rel="noopener">回到原视频 (00:08:45)</a></p>
+</div>
+
+<h2 id="7-openglvertexarray">7. 工厂创建 OpenGLVertexArray</h2>
+<p><em>(参考时间: 00:10:52)</em></p>
+<p><code>VertexArray.cpp</code> 沿用第 30 讲的后端分派模式：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"hzpch.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"VertexArray.h"</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"Renderer.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"Platform/OpenGL/OpenGLVertexArray.h"</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">Hazel</span><span class="w"> </span><span class="p">{</span>
+
+<span class="n">VertexArray</span><span class="o">*</span><span class="w"> </span><span class="nf">VertexArray::Create</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">Renderer</span><span class="o">::</span><span class="n">GetAPI</span><span class="p">())</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">RendererAPI</span><span class="o">::</span><span class="no">None</span><span class="p">:</span>
+<span class="w">            </span><span class="n">HZ_CORE_ASSERT</span><span class="p">(</span>
+<span class="w">                </span><span class="nb">false</span><span class="p">,</span>
+<span class="w">                </span><span class="s">"RendererAPI::None is currently not supported!"</span><span class="p">);</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="nb">nullptr</span><span class="p">;</span>
+
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">RendererAPI</span><span class="o">::</span><span class="no">OpenGL</span><span class="p">:</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">OpenGLVertexArray</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">HZ_CORE_ASSERT</span><span class="p">(</span><span class="nb">false</span><span class="p">,</span><span class="w"> </span><span class="s">"Unknown RendererAPI!"</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">nullptr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="p">}</span>
+</code></pre></div>
+
+<p>上层只看到 <code>VertexArray::Create()</code>，OpenGL VAO 的创建细节留在平台目录。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant App
+    participant VA as VertexArray
+    participant GL as OpenGLVertexArray
+    App-&gt;&gt;VA: Create()
+    VA-&gt;&gt;VA: Renderer::GetAPI()
+    VA-&gt;&gt;GL: new OpenGLVertexArray()
+    GL--&gt;&gt;App: VertexArray*
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_12_00.png" alt="VertexArray 工厂按当前渲染 API 选择 OpenGL 实现" loading="lazy">
+  <p class="video-caption">📷 VertexArray 工厂按当前渲染 API 选择 OpenGL 实现<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=720" target="_blank" rel="noopener">回到原视频 (00:12:00)</a></p>
+</div>
+
+<h2 id="8-openglvertexarray-cpu">8. OpenGLVertexArray 的 CPU 侧镜像</h2>
+<p><em>(参考时间: 00:13:41)</em></p>
+<p>OpenGL 实现在 CPU 侧保存一份资源列表：</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">OpenGLVertexArray</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">VertexArray</span>
+<span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">OpenGLVertexArray</span><span class="p">();</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="o">~</span><span class="n">OpenGLVertexArray</span><span class="p">();</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">Bind</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">Unbind</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">AddVertexBuffer</span><span class="p">(</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexBuffer</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">vertexBuffer</span><span class="p">)</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">SetIndexBuffer</span><span class="p">(</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">IndexBuffer</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">indexBuffer</span><span class="p">)</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexBuffer</span><span class="o">&gt;&gt;&amp;</span>
+<span class="w">    </span><span class="n">GetVertexBuffers</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">m_VertexBuffers</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">virtual</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">IndexBuffer</span><span class="o">&gt;&amp;</span>
+<span class="w">    </span><span class="n">GetIndexBuffer</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">m_IndexBuffer</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">m_RendererID</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexBuffer</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">m_VertexBuffers</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">IndexBuffer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">m_IndexBuffer</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p><code>m_VertexBuffers</code> 镜像一个 VAO 可以关联多个 Vertex Buffer 的事实；<code>m_IndexBuffer</code> 只保存一个索引缓冲。</p>
+<p>这层镜像不是为了复制 GPU 数据，而是为了在 C++ 侧保持资源存活，并能通过通用 getter 查询 Draw Call 所需的索引数量。</p>
+<div class="highlight"><pre><span></span><code>classDiagram
+    class OpenGLVertexArray {
+        -uint32_t m_RendererID
+        -vector~shared_ptr~ m_VertexBuffers
+        -shared_ptr~IndexBuffer~ m_IndexBuffer
+        +Bind()
+        +Unbind()
+        +AddVertexBuffer()
+        +SetIndexBuffer()
+    }
+    VertexArray &lt;|-- OpenGLVertexArray
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_13_43.png" alt="OpenGLVertexArray 在 CPU 侧持有一组 Vertex Buffer 引用" loading="lazy">
+  <p class="video-caption">📷 OpenGLVertexArray 在 CPU 侧持有一组 Vertex Buffer 引用<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=823" target="_blank" rel="noopener">回到原视频 (00:13:43)</a></p>
+</div>
+
+<h2 id="9-vao">9. 创建、绑定与销毁 VAO</h2>
+<p><em>(参考时间: 00:15:16)</em></p>
+<p>构造函数使用 OpenGL 4.5 的直接创建接口：</p>
+<div class="highlight"><pre><span></span><code><span class="n">OpenGLVertexArray</span><span class="o">::</span><span class="n">OpenGLVertexArray</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glCreateVertexArrays</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">m_RendererID</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="n">OpenGLVertexArray</span><span class="o">::~</span><span class="n">OpenGLVertexArray</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glDeleteVertexArrays</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">m_RendererID</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="n">OpenGLVertexArray</span><span class="o">::</span><span class="n">Bind</span><span class="p">()</span><span class="w"> </span><span class="k">const</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glBindVertexArray</span><span class="p">(</span><span class="n">m_RendererID</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="n">OpenGLVertexArray</span><span class="o">::</span><span class="n">Unbind</span><span class="p">()</span><span class="w"> </span><span class="k">const</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glBindVertexArray</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>最初忘记 <code>OpenGLVertexArray.cpp</code> 包含 Glad，导致 VAO 创建函数无法识别。加入 <code>&lt;glad/glad.h&gt;</code> 后才正常。</p>
+<p><code>m_RendererID</code> 仍是 <code>uint32_t</code>。讲师提到未来可以定义专门的渲染资源 ID 类型，避免到处出现裸整数，但当前不需要扩大改动范围。</p>
+<div class="highlight"><pre><span></span><code>stateDiagram-v2
+    [*] --&gt; Created: glCreateVertexArrays
+    Created --&gt; Bound: Bind / glBindVertexArray(id)
+    Bound --&gt; Unbound: Unbind / glBindVertexArray(0)
+    Unbound --&gt; Bound: Bind
+    Bound --&gt; Destroyed: destructor
+    Unbound --&gt; Destroyed: destructor
+    Destroyed --&gt; [*]: glDeleteVertexArrays
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_15_16.png" alt="OpenGLVertexArray 构造时创建 VAO，析构时删除 VAO" loading="lazy">
+  <p class="video-caption">📷 OpenGLVertexArray 构造时创建 VAO，析构时删除 VAO<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=916" target="_blank" rel="noopener">回到原视频 (00:15:16)</a></p>
+</div>
+
+<h2 id="10-addvertexbuffer">10. AddVertexBuffer 绑定属性状态</h2>
+<p><em>(参考时间: 00:17:32)</em></p>
+<p>添加 Vertex Buffer 时，必须先让对应的 VAO 成为当前绑定状态：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">OpenGLVertexArray::AddVertexBuffer</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexBuffer</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">vertexBuffer</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">HZ_CORE_ASSERT</span><span class="p">(</span>
+<span class="w">        </span><span class="n">vertexBuffer</span><span class="o">-&gt;</span><span class="n">GetLayout</span><span class="p">().</span><span class="n">GetElements</span><span class="p">().</span><span class="n">size</span><span class="p">(),</span>
+<span class="w">        </span><span class="s">"Vertex Buffer has no layout!"</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">glBindVertexArray</span><span class="p">(</span><span class="n">m_RendererID</span><span class="p">);</span>
+<span class="w">    </span><span class="n">vertexBuffer</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">layout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vertexBuffer</span><span class="o">-&gt;</span><span class="n">GetLayout</span><span class="p">();</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">element</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">layout</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">glEnableVertexAttribArray</span><span class="p">(</span><span class="n">index</span><span class="p">);</span>
+<span class="w">        </span><span class="n">glVertexAttribPointer</span><span class="p">(</span>
+<span class="w">            </span><span class="n">index</span><span class="p">,</span>
+<span class="w">            </span><span class="n">element</span><span class="p">.</span><span class="n">GetComponentCount</span><span class="p">(),</span>
+<span class="w">            </span><span class="n">ShaderDataTypeToOpenGLBaseType</span><span class="p">(</span><span class="n">element</span><span class="p">.</span><span class="n">Type</span><span class="p">),</span>
+<span class="w">            </span><span class="n">element</span><span class="p">.</span><span class="n">Normalized</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">GL_TRUE</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">GL_FALSE</span><span class="p">,</span>
+<span class="w">            </span><span class="n">layout</span><span class="p">.</span><span class="n">GetStride</span><span class="p">(),</span>
+<span class="w">            </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="p">)</span><span class="n">element</span><span class="p">.</span><span class="n">Offset</span><span class="p">);</span>
+<span class="w">        </span><span class="n">index</span><span class="o">++</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">m_VertexBuffers</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">vertexBuffer</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>执行顺序很重要：</p>
+<ol>
+<li>检查布局非空；</li>
+<li>绑定目标 VAO；</li>
+<li>绑定 Vertex Buffer；</li>
+<li>按布局设置每个属性；</li>
+<li>保存共享指针。</li>
+</ol>
+<p>属性配置属于当前 VAO，因此如果在添加 Buffer 前没有绑定目标 VAO，状态会写入错误的 VAO。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant VA as OpenGLVertexArray
+    participant VB as VertexBuffer
+    participant GL as OpenGL
+    VA-&gt;&gt;VA: 检查布局非空
+    VA-&gt;&gt;GL: glBindVertexArray(VAO)
+    VA-&gt;&gt;VB: Bind()
+    loop 每个 BufferElement
+        VA-&gt;&gt;GL: glEnableVertexAttribArray
+        VA-&gt;&gt;GL: glVertexAttribPointer
+    end
+    VA-&gt;&gt;VA: m_VertexBuffers.push_back()
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_17_32.png" alt="AddVertexBuffer 把缓冲区布局物化为 OpenGL 属性状态" loading="lazy">
+  <p class="video-caption">📷 AddVertexBuffer 把缓冲区布局物化为 OpenGL 属性状态<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=1052" target="_blank" rel="noopener">回到原视频 (00:17:32)</a></p>
+</div>
+
+<h2 id="11-direct-gl">11. 内部调用 Direct GL 还是包装方法</h2>
+<p><em>(参考时间: 00:16:14)</em></p>
+<p>在 <code>AddVertexBuffer()</code> 内部，讲师直接调用：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glBindVertexArray</span><span class="p">(</span><span class="n">m_RendererID</span><span class="p">);</span>
+</code></pre></div>
+
+<p>而不是调用自己的 <code>Bind()</code>。</p>
+<p>原因是 <code>Bind()</code> 是开放给上层渲染代码的公共操作。未来加入状态跟踪、调试、统计或回调时，上层绑定应该被记录，而实现内部为了配置属性而执行的临时绑定不应该伪装成一次用户绑定。</p>
+<p>但对于其他资源，代码会调用 <code>vertexBuffer-&gt;Bind()</code>，因为这里操作的是另一个 API 对象，不应该绕过它去读取私有 Renderer ID。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[内部需要绑定 VAO] --&gt; B{直接 GL 还是 this-&gt;Bind}
+    B -- 直接 GL --&gt; C[不触发上层状态跟踪]
+    B -- 公共 Bind --&gt; D[会被视作一次外部渲染操作]
+    A --&gt; E[绑定 VertexBuffer]
+    E --&gt; F[调用 vertexBuffer-&gt;Bind]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_16_14.png" alt="平台内部配置使用直接 GL 调用，避免污染上层状态跟踪" loading="lazy">
+  <p class="video-caption">📷 平台内部配置使用直接 GL 调用，避免污染上层状态跟踪<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=974" target="_blank" rel="noopener">回到原视频 (00:16:14)</a></p>
+</div>
+
+<h2 id="12">12. 缺少布局时立即断言</h2>
+<p><em>(参考时间: 00:24:47)</em></p>
+<p>如果先把 Vertex Buffer 加入 Vertex Array，再设置布局，属性数量、stride 和 offset 都还是空的。</p>
+<p>为了避免这种顺序错误悄悄产生不可预期的 GL 状态，<code>AddVertexBuffer()</code> 使用断言：</p>
+<div class="highlight"><pre><span></span><code><span class="n">HZ_CORE_ASSERT</span><span class="p">(</span>
+<span class="w">    </span><span class="n">vertexBuffer</span><span class="o">-&gt;</span><span class="n">GetLayout</span><span class="p">().</span><span class="n">GetElements</span><span class="p">().</span><span class="n">size</span><span class="p">(),</span>
+<span class="w">    </span><span class="s">"Vertex Buffer has no layout!"</span><span class="p">);</span>
+</code></pre></div>
+
+<p>正确顺序是：</p>
+<div class="highlight"><pre><span></span><code><span class="n">vertexBuffer</span><span class="o">-&gt;</span><span class="n">SetLayout</span><span class="p">(</span><span class="n">layout</span><span class="p">);</span>
+<span class="n">vertexArray</span><span class="o">-&gt;</span><span class="n">AddVertexBuffer</span><span class="p">(</span><span class="n">vertexBuffer</span><span class="p">);</span>
+</code></pre></div>
+
+<p>错误顺序会在调试阶段直接触发断言，而不是等到画面缺失后才猜原因。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[创建 VertexBuffer] --&gt; B{是否设置 Layout}
+    B -- 否 --&gt; C[AddVertexBuffer 触发断言]
+    B -- 是 --&gt; D[配置属性]
+    D --&gt; E[VAO 可绘制]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_24_48.png" alt="没有布局的 Vertex Buffer 通过断言阻止错误接入" loading="lazy">
+  <p class="video-caption">📷 没有布局的 Vertex Buffer 通过断言阻止错误接入<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=1488" target="_blank" rel="noopener">回到原视频 (00:24:48)</a></p>
+</div>
+
+<h2 id="13-setindexbuffer">13. SetIndexBuffer 同样依赖绑定状态</h2>
+<p><em>(参考时间: 00:19:23)</em></p>
+<p>索引缓冲通过 <code>SetIndexBuffer()</code> 关联：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">OpenGLVertexArray::SetIndexBuffer</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">IndexBuffer</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">indexBuffer</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glBindVertexArray</span><span class="p">(</span><span class="n">m_RendererID</span><span class="p">);</span>
+<span class="w">    </span><span class="n">indexBuffer</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="w">    </span><span class="n">m_IndexBuffer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">indexBuffer</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>只有当前绑定的 VAO 会记录当前绑定的 Element Array Buffer。因此这里也必须先绑定目标 VAO。</p>
+<p>保存 <code>m_IndexBuffer</code> 后，上层可以通过：</p>
+<div class="highlight"><pre><span></span><code><span class="n">vertexArray</span><span class="o">-&gt;</span><span class="n">GetIndexBuffer</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">GetCount</span><span class="p">()</span>
+</code></pre></div>
+
+<p>得到 <code>glDrawElements()</code> 所需的索引数量，不必在 Application 中再保存一份索引数量的副本。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant App
+    participant VA as OpenGLVertexArray
+    participant IB as IndexBuffer
+    participant GL as OpenGL
+    App-&gt;&gt;VA: SetIndexBuffer(indexBuffer)
+    VA-&gt;&gt;GL: glBindVertexArray(VAO)
+    VA-&gt;&gt;IB: Bind()
+    GL-&gt;&gt;GL: VAO 记录当前 EBO
+    VA-&gt;&gt;VA: m_IndexBuffer = indexBuffer
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_20_02.png" alt="Index Buffer 在 VAO 绑定期间设置并保存共享引用" loading="lazy">
+  <p class="video-caption">📷 Index Buffer 在 VAO 绑定期间设置并保存共享引用<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=1202" target="_blank" rel="noopener">回到原视频 (00:20:02)</a></p>
+</div>
+
+<h2 id="14-application-vertexarray">14. Application 改用通用 VertexArray</h2>
+<p><em>(参考时间: 00:21:44)</em></p>
+<p>Application 头部新增：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"Hazel/Renderer/VertexArray.h"</span>
+</code></pre></div>
+
+<p>成员从裸 VAO ID 改为：</p>
+<div class="highlight"><pre><span></span><code><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexArray</span><span class="o">&gt;</span><span class="w"> </span><span class="n">m_VertexArray</span><span class="p">;</span>
+</code></pre></div>
+
+<p>三角形的 VAO 初始化变成：</p>
+<div class="highlight"><pre><span></span><code><span class="n">m_VertexArray</span><span class="p">.</span><span class="n">reset</span><span class="p">(</span><span class="n">VertexArray</span><span class="o">::</span><span class="n">Create</span><span class="p">());</span>
+
+<span class="kt">float</span><span class="w"> </span><span class="n">vertices</span><span class="p">[</span><span class="mi">3</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">7</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="mf">-0.5f</span><span class="p">,</span><span class="w"> </span><span class="mf">-0.5f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.8f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.2f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.8f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0f</span><span class="p">,</span>
+<span class="w">     </span><span class="mf">0.5f</span><span class="p">,</span><span class="w"> </span><span class="mf">-0.5f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.2f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.3f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.8f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0f</span><span class="p">,</span>
+<span class="w">     </span><span class="mf">0.0f</span><span class="p">,</span><span class="w">  </span><span class="mf">0.5f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.8f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.8f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.2f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0f</span>
+<span class="p">};</span>
+
+<span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexBuffer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">vertexBuffer</span><span class="p">;</span>
+<span class="n">vertexBuffer</span><span class="p">.</span><span class="n">reset</span><span class="p">(</span>
+<span class="w">    </span><span class="n">VertexBuffer</span><span class="o">::</span><span class="n">Create</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">vertices</span><span class="p">)));</span>
+<span class="n">vertexBuffer</span><span class="o">-&gt;</span><span class="n">SetLayout</span><span class="p">({</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="n">ShaderDataType</span><span class="o">::</span><span class="n">Float3</span><span class="p">,</span><span class="w"> </span><span class="s">"a_Position"</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="n">ShaderDataType</span><span class="o">::</span><span class="n">Float4</span><span class="p">,</span><span class="w"> </span><span class="s">"a_Color"</span><span class="w"> </span><span class="p">}</span>
+<span class="p">});</span>
+<span class="n">m_VertexArray</span><span class="o">-&gt;</span><span class="n">AddVertexBuffer</span><span class="p">(</span><span class="n">vertexBuffer</span><span class="p">);</span>
+
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">indices</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">};</span>
+<span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">IndexBuffer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">indexBuffer</span><span class="p">;</span>
+<span class="n">indexBuffer</span><span class="p">.</span><span class="n">reset</span><span class="p">(</span>
+<span class="w">    </span><span class="n">IndexBuffer</span><span class="o">::</span><span class="n">Create</span><span class="p">(</span><span class="n">indices</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">));</span>
+<span class="n">m_VertexArray</span><span class="o">-&gt;</span><span class="n">SetIndexBuffer</span><span class="p">(</span><span class="n">indexBuffer</span><span class="p">);</span>
+</code></pre></div>
+
+<p>第一次编译出现名称为 <code>m_VertexArray</code> 的重定义，因为旧裸 VAO 成员仍存在。删除旧成员、补上 <code>Platform/OpenGL/OpenGLVertexArray.h</code> 的包含路径后，三角形重新正常显示。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Application] --&gt; B[VertexArray::Create]
+    A --&gt; C[VertexBuffer::Create]
+    C --&gt; D[SetLayout]
+    B --&gt; E[AddVertexBuffer]
+    A --&gt; F[IndexBuffer::Create]
+    B --&gt; G[SetIndexBuffer]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_21_44.png" alt="Application 不再直接调用 glVertexAttribPointer，而是组合通用资源" loading="lazy">
+  <p class="video-caption">📷 Application 不再直接调用 glVertexAttribPointer，而是组合通用资源<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=1304" target="_blank" rel="noopener">回到原视频 (00:21:44)</a></p>
+</div>
+
+<h2 id="15">15. 增加第二个可绘制对象</h2>
+<p><em>(参考时间: 00:29:01)</em></p>
+<p>为了验证 Vertex Array 可以复用，讲师增加第二个 VAO：</p>
+<div class="highlight"><pre><span></span><code><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">Shader</span><span class="o">&gt;</span><span class="w"> </span><span class="n">m_BlueShader</span><span class="p">;</span>
+<span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexArray</span><span class="o">&gt;</span><span class="w"> </span><span class="n">m_SquareVA</span><span class="p">;</span>
+</code></pre></div>
+
+<p>单独创建方块所需的顶点：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">float</span><span class="w"> </span><span class="n">squareVertices</span><span class="p">[</span><span class="mi">3</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="mf">-0.75f</span><span class="p">,</span><span class="w"> </span><span class="mf">-0.75f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">,</span>
+<span class="w">     </span><span class="mf">0.75f</span><span class="p">,</span><span class="w"> </span><span class="mf">-0.75f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">,</span>
+<span class="w">     </span><span class="mf">0.75f</span><span class="p">,</span><span class="w">  </span><span class="mf">0.75f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">,</span>
+<span class="w">    </span><span class="mf">-0.75f</span><span class="p">,</span><span class="w">  </span><span class="mf">0.75f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0f</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>方块只有位置属性：</p>
+<div class="highlight"><pre><span></span><code><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">VertexBuffer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">squareVB</span><span class="p">;</span>
+<span class="n">squareVB</span><span class="p">.</span><span class="n">reset</span><span class="p">(</span><span class="n">VertexBuffer</span><span class="o">::</span><span class="n">Create</span><span class="p">(</span>
+<span class="w">    </span><span class="n">squareVertices</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">squareVertices</span><span class="p">)));</span>
+
+<span class="n">squareVB</span><span class="o">-&gt;</span><span class="n">SetLayout</span><span class="p">({</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="n">ShaderDataType</span><span class="o">::</span><span class="n">Float3</span><span class="p">,</span><span class="w"> </span><span class="s">"a_Position"</span><span class="w"> </span><span class="p">}</span>
+<span class="p">});</span>
+
+<span class="n">m_SquareVA</span><span class="p">.</span><span class="n">reset</span><span class="p">(</span><span class="n">VertexArray</span><span class="o">::</span><span class="n">Create</span><span class="p">());</span>
+<span class="n">m_SquareVA</span><span class="o">-&gt;</span><span class="n">AddVertexBuffer</span><span class="p">(</span><span class="n">squareVB</span><span class="p">);</span>
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>classDiagram
+    class Application {
+        -shared_ptr~VertexArray~ m_VertexArray
+        -shared_ptr~VertexArray~ m_SquareVA
+        -shared_ptr~Shader~ m_Shader
+        -shared_ptr~Shader~ m_BlueShader
+    }
+    Application o-- VertexArray
+    Application o-- Shader
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_29_02.png" alt="第二个 VertexArray 使用自己的顶点缓冲和布局" loading="lazy">
+  <p class="video-caption">📷 第二个 VertexArray 使用自己的顶点缓冲和布局<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=1742" target="_blank" rel="noopener">回到原视频 (00:29:02)</a></p>
+</div>
+
+<h2 id="16">16. 一个方块需要六个索引</h2>
+<p><em>(参考时间: 00:34:43)</em></p>
+<p>方块由两个三角形组成：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">uint32_t</span><span class="w"> </span><span class="n">squareIndices</span><span class="p">[</span><span class="mi">6</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<span class="w">    </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p>创建 Index Buffer 并设置到方块 VAO：</p>
+<div class="highlight"><pre><span></span><code><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">IndexBuffer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">squareIB</span><span class="p">;</span>
+<span class="n">squareIB</span><span class="p">.</span><span class="n">reset</span><span class="p">(</span><span class="n">IndexBuffer</span><span class="o">::</span><span class="n">Create</span><span class="p">(</span>
+<span class="w">    </span><span class="n">squareIndices</span><span class="p">,</span>
+<span class="w">    </span><span class="k">sizeof</span><span class="p">(</span><span class="n">squareIndices</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">)));</span>
+
+<span class="n">m_SquareVA</span><span class="o">-&gt;</span><span class="n">SetIndexBuffer</span><span class="p">(</span><span class="n">squareIB</span><span class="p">);</span>
+</code></pre></div>
+
+<p>方块只接受位置，而三角形的原 Shader 还要求颜色属性。因此新增一个只读取 <code>a_Position</code> 的蓝色 Shader，Fragment Shader 直接返回固定蓝色：</p>
+<div class="highlight"><pre><span></span><code><span class="k">layout</span><span class="p">(</span><span class="n">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mo">0</span><span class="p">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="kt">vec3</span><span class="w"> </span><span class="n">a_Position</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="n">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="nb">gl_Position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">vec4</span><span class="p">(</span><span class="n">a_Position</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="k">layout</span><span class="p">(</span><span class="n">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mo">0</span><span class="p">)</span><span class="w"> </span><span class="k">out</span><span class="w"> </span><span class="kt">vec4</span><span class="w"> </span><span class="n">color</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="n">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">vec4</span><span class="p">(</span><span class="mf">0.2</span><span class="p">,</span><span class="w"> </span><span class="mf">0.3</span><span class="p">,</span><span class="w"> </span><span class="mf">0.8</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[4 个方块顶点] --&gt; B[VertexBuffer Float3]
+    C[6 个索引] --&gt; D[IndexBuffer]
+    B --&gt; E[Square VertexArray]
+    D --&gt; E
+    F[Position-only Shader] --&gt; G[固定蓝色]
+    E --&gt; H[glDrawElements]
+    G --&gt; H
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_33_00.png" alt="方块使用独立 Index Buffer 和只含位置属性的蓝色 Shader" loading="lazy">
+  <p class="video-caption">📷 方块使用独立 Index Buffer 和只含位置属性的蓝色 Shader<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=1980" target="_blank" rel="noopener">回到原视频 (00:33:00)</a></p>
+</div>
+
+<h2 id="17">17. 绘制顺序与对象绑定</h2>
+<p><em>(参考时间: 00:35:47)</em></p>
+<p>Run 循环中先绘制方块：</p>
+<div class="highlight"><pre><span></span><code><span class="n">m_BlueShader</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="n">m_SquareVA</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="n">glDrawElements</span><span class="p">(</span>
+<span class="w">    </span><span class="n">GL_TRIANGLES</span><span class="p">,</span>
+<span class="w">    </span><span class="n">m_SquareVA</span><span class="o">-&gt;</span><span class="n">GetIndexBuffer</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">GetCount</span><span class="p">(),</span>
+<span class="w">    </span><span class="n">GL_UNSIGNED_INT</span><span class="p">,</span>
+<span class="w">    </span><span class="nb">nullptr</span><span class="p">);</span>
+</code></pre></div>
+
+<p>再绘制渐变三角形：</p>
+<div class="highlight"><pre><span></span><code><span class="n">m_Shader</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="n">m_VertexArray</span><span class="o">-&gt;</span><span class="n">Bind</span><span class="p">();</span>
+<span class="n">glDrawElements</span><span class="p">(</span>
+<span class="w">    </span><span class="n">GL_TRIANGLES</span><span class="p">,</span>
+<span class="w">    </span><span class="n">m_VertexArray</span><span class="o">-&gt;</span><span class="n">GetIndexBuffer</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">GetCount</span><span class="p">(),</span>
+<span class="w">    </span><span class="n">GL_UNSIGNED_INT</span><span class="p">,</span>
+<span class="w">    </span><span class="nb">nullptr</span><span class="p">);</span>
+</code></pre></div>
+
+<p>绘制一个对象时，Shader、Vertex Array 和 Draw Call 必须属于同一组状态。第一次运行看起来像画了两个对象，但方块只有三个顶点，明显少了一半。</p>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant App
+    participant BlueShader
+    participant SquareVA
+    participant TriangleShader
+    participant TriangleVA
+    App-&gt;&gt;BlueShader: Bind
+    App-&gt;&gt;SquareVA: Bind
+    App-&gt;&gt;SquareVA: DrawIndexed
+    App-&gt;&gt;TriangleShader: Bind
+    App-&gt;&gt;TriangleVA: Bind
+    App-&gt;&gt;TriangleVA: DrawIndexed
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_35_47.png" alt="两个 VAO 与两套 Shader 分别绑定后绘制对象" loading="lazy">
+  <p class="video-caption">📷 两个 VAO 与两套 Shader 分别绑定后绘制对象<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=2147" target="_blank" rel="noopener">回到原视频 (00:35:47)</a></p>
+</div>
+
+<h2 id="18">18. 方块只画三个顶点的排查</h2>
+<p><em>(参考时间: 00:37:36)</em></p>
+<p>方块索引明明有 6 个，却只显示三角形。讲师先怀疑 Index Buffer 的 <code>GetCount()</code>：</p>
+<div class="highlight"><pre><span></span><code><span class="k">virtual</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="nf">GetCount</span><span class="p">()</span><span class="w"> </span><span class="k">const</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">m_Count</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>检查后确认 <code>m_Count</code> 正常保存了构造函数收到的数量。继续检查 Application 时发现：</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// 错误：把三角形的 m_IndexBuffer 设置到了方块 VAO</span>
+<span class="n">m_SquareVA</span><span class="o">-&gt;</span><span class="n">SetIndexBuffer</span><span class="p">(</span><span class="n">m_IndexBuffer</span><span class="p">);</span>
+</code></pre></div>
+
+<p>正确写法必须使用方块自己的索引缓冲：</p>
+<div class="highlight"><pre><span></span><code><span class="n">m_SquareVA</span><span class="o">-&gt;</span><span class="n">SetIndexBuffer</span><span class="p">(</span><span class="n">squareIB</span><span class="p">);</span>
+</code></pre></div>
+
+<p>修复后，Draw Call 从方块 VAO 取到 6，终于画出完整的两个三角形。</p>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    A[方块只显示一个三角形] --&gt; B{GetCount 返回正确吗}
+    B -- 是 --&gt; C{VAO 中绑定的是哪个 IndexBuffer}
+    C --&gt; D[错误：三角形 IB，Count = 3]
+    D --&gt; E[改为 squareIB]
+    E --&gt; F[Count = 6，方块完整]
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_38_19.png" alt="方块缺角来自 VAO 错误地引用了三角形索引缓冲" loading="lazy">
+  <p class="video-caption">📷 方块缺角来自 VAO 错误地引用了三角形索引缓冲<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=2299" target="_blank" rel="noopener">回到原视频 (00:38:19)</a></p>
+</div>
+
+<h2 id="19">19. 最终画面与资源清理</h2>
+<p><em>(参考时间: 00:39:16)</em></p>
+<p>修复后，蓝色方块位于背景，渐变三角形在前景。方块顶点从 <code>0.5</code> 扩大到 <code>0.75</code>，使两者形成清晰的前后层次。</p>
+<p>最后清理 Application 中已不再需要的局部 Buffer 成员：</p>
+<ul>
+<li>不再单独保存 <code>m_VertexBuffer</code>；</li>
+<li>不再单独保存 <code>m_IndexBuffer</code>；</li>
+<li>需要索引数量时，通过 <code>m_VertexArray-&gt;GetIndexBuffer()-&gt;GetCount()</code> 获取；</li>
+<li>Vertex Array 的 <code>shared_ptr</code> 持有全部资源。</li>
+</ul>
+<p>本地加载变量仍可短暂存在，离开作用域后由 Vertex Array 保持资源存活。</p>
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Application] --&gt; B[m_VertexArray]
+    B --&gt; C[Vertex Buffer shared_ptr]
+    B --&gt; D[Index Buffer shared_ptr]
+    E[局部 vertexBuffer] -.作用域结束 .-&gt; B
+    F[局部 indexBuffer] -.作用域结束 .-&gt; B
+</code></pre></div>
+
+<div class="video-card screenshot-card">
+  <img src="images/shot_00_39_36.png" alt="最终画面同时显示蓝色方块和渐变三角形" loading="lazy">
+  <p class="video-caption">📷 最终画面同时显示蓝色方块和渐变三角形<br><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32&t=2376" target="_blank" rel="noopener">回到原视频 (00:39:36)</a></p>
+</div>
+
+<h2 id="20">20. 析构与下一阶段</h2>
+<p><em>(参考时间: 00:40:45)</em></p>
+<p>补上析构函数后，VAO 会正确释放：</p>
+<div class="highlight"><pre><span></span><code><span class="n">OpenGLVertexArray</span><span class="o">::~</span><span class="n">OpenGLVertexArray</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">glDeleteVertexArrays</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">m_RendererID</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>此时 Application 已经不再直接创建 VAO，也不再直接配置顶点属性。但仍保留一条 OpenGL Draw Call：</p>
+<div class="highlight"><pre><span></span><code><span class="n">glDrawElements</span><span class="p">(</span>
+<span class="w">    </span><span class="n">GL_TRIANGLES</span><span class="p">,</span>
+<span class="w">    </span><span class="n">vertexArray</span><span class="o">-&gt;</span><span class="n">GetIndexBuffer</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">GetCount</span><span class="p">(),</span>
+<span class="w">    </span><span class="n">GL_UNSIGNED_INT</span><span class="p">,</span>
+<span class="w">    </span><span class="nb">nullptr</span><span class="p">);</span>
+</code></pre></div>
+
+<p>下一步需要抽象 Renderer 与 Draw Command，让应用层不再直接包含 Glad，也不直接调用 <code>glDrawElements()</code>。</p>
+<div class="highlight"><pre><span></span><code>graph LR
+    A[本讲: VertexArray abstraction] --&gt; B[下一讲: Renderer / Draw Command]
+    B --&gt; C[Application 不包含 Glad]
+    C --&gt; D[上层提交渲染请求]
+    D --&gt; E[平台后端执行 Draw Call]
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>graph TD
+    A[Application] --&gt; B[Renderer]
+    B --&gt; C[RenderCommand]
+    C --&gt; D[OpenGLVertexArray::Bind]
+    C --&gt; E[Index Buffer Count]
+    C --&gt; F[glDrawElements]
+</code></pre></div>
+
+<h2 id="21">21. 本节结论</h2>
+<p>本讲完成了 Hazel 对 Vertex Array 的抽象：</p>
+<ul>
+<li>明确 Vertex Array 是状态容器，不保存实际顶点数据；</li>
+<li>建立通用 <code>VertexArray</code> 接口；</li>
+<li>用 <code>VertexArray::Create()</code> 按渲染 API 选择实现；</li>
+<li>用 <code>shared_ptr</code> 管理 Buffer 生命周期；</li>
+<li>在 <code>OpenGLVertexArray</code> 中创建和销毁 VAO；</li>
+<li>在 VAO 绑定期间配置 Vertex Buffer 属性；</li>
+<li>在 VAO 绑定期间关联唯一 Index Buffer；</li>
+<li>用断言阻止无布局 Vertex Buffer；</li>
+<li>重构 Application，移除裸 VAO 与属性配置；</li>
+<li>创建第二个 VAO 绘制蓝色方块；</li>
+<li>通过错误 Index Buffer 的实际案例验证 VAO 与 EBO 的关联状态；</li>
+<li>通过 getter 从 Vertex Array 获取索引数量；</li>
+<li>清理多余 Buffer 成员，让 VAO 成为资源组合入口。</li>
+</ul>
+<p>至此，Hazel 已经能通过通用对象完成大部分资源设置。剩余的关键边界是 Draw Call：只要它仍暴露在 Application 中，渲染后端就还没有真正隐藏完成。</p>
+<h2 id="_2">附：参考</h2>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1wtLazEEmC/?p=32">Bilibili 精译视频：032 - 顶点数组</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT5">The Cherno 游戏引擎系列播放列表</a></li>
+<li><a href="https://github.com/TheCherno/Hazel/tree/0d292a3">本期对应代码提交 <code>0d292a3</code></a></li>
+<li><a href="https://www.khronos.org/opengl/wiki/Vertex_Specification">OpenGL Wiki：Vertex Specification</a></li>
+<li><a href="https://www.khronos.org/opengl/wiki/Vertex_Specification#Vertex_Array_Object">OpenGL Wiki：Vertex Array Object</a></li>
+</ul>
+    </article>
+
+    <!-- Mermaid 图表引擎初始化 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            // 兼容普通代码块以及丢失 language-mermaid 类名的情况 (CodeHilite 干扰)
+            const codeNodes = document.querySelectorAll('pre code, .highlight code');
+            codeNodes.forEach(function(node) {
+                const text = node.textContent.trim();
+                // 匹配常见的 mermaid 图表前缀
+                if (text.startsWith('graph ') || text.startsWith('flowchart ') || text.startsWith('sequenceDiagram') || text.startsWith('gantt') || text.startsWith('pie') || text.startsWith('classDiagram') || text.startsWith('stateDiagram') || text.startsWith('mindmap')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.className = 'mermaid';
+                    tempDiv.textContent = text;
+                    
+                    // 获取需要替换的最外层父节点 (比如 div.highlight 或者 pre)
+                    const wrapper = node.closest('.highlight') || node.parentNode;
+                    wrapper.replaceWith(tempDiv); 
+                }
+            });
+            
+            // 所有节点转换完成，统一进行图表动态绘制
+            mermaid.run();
+        });
+    </script>
+    <!-- Lightbox：截图点击放大 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const lightbox = document.createElement('div');
+            lightbox.className = 'lightbox';
+            lightbox.innerHTML = '<img alt=""><div class="lightbox-caption"></div>';
+            document.body.appendChild(lightbox);
+            const lbImg = lightbox.querySelector('img');
+            const lbCap = lightbox.querySelector('.lightbox-caption');
+            function openLightbox(src, alt) {
+                lbImg.src = src; lbImg.alt = alt || '';
+                lbCap.textContent = alt || '';
+                lightbox.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeLightbox() {
+                lightbox.classList.remove('open');
+                lbImg.src = '';
+                document.body.style.overflow = '';
+            }
+            document.querySelectorAll('.screenshot-card img').forEach(function(img) {
+                img.addEventListener('click', function() { openLightbox(img.src, img.alt); });
+            });
+            lightbox.addEventListener('click', closeLightbox);
+            document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+        });
+    </script>
+</body>
+</html>
