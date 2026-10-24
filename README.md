@@ -84,6 +84,10 @@
   - [Markdown 版本](<Hazel Game Engine/033 - Render Flow and Submission/book.md>)
   - 视频来源：[Bilibili 精译版第 33 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=33)
   - 主题：`Renderer`、`RenderCommand`、`RendererAPI`、场景提交边界、OpenGL Draw Call 封装和 Glad 解耦
+- [034 - 摄像机及其工作原理](<Hazel Game Engine/034 - Cameras and How They Work/book.html>)
+  - [Markdown 版本](<Hazel Game Engine/034 - Cameras and How They Work/book.md>)
+  - 视频来源：[Bilibili 精译版第 34 讲](https://www.bilibili.com/video/BV1wtLazEEmC/?p=34)
+  - 主题：摄像机数据、View/Projection 矩阵、FOV 与宽高比、MVP 变换、场景 uniform 和正交相机规划
 
 ## 南京大学操作系统原理 2026
 
